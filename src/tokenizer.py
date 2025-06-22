@@ -1,0 +1,310 @@
+import argparse
+import re
+import sys
+import os
+from dataclasses import dataclass, field
+from enum import Enum, auto
+from typing import Dict, List, Optional, Tuple, Union, Any
+from pathlib import Path
+
+
+class TokenType(Enum):
+    """Token types for lexical analysis."""
+
+    INSTRUCTION = auto()
+    REGISTER = auto()
+    IMMEDIATE = auto()
+    LABEL = auto()
+    DIRECTIVE = auto()
+    STRING = auto()
+    CHARACTER = auto()
+    COMMENT = auto()
+    NEWLINE = auto()
+    COMMA = auto()
+    COLON = auto()
+    LPAREN = auto()
+    RPAREN = auto()
+    EOF = auto()
+
+
+@dataclass
+class Token:
+    """Represents a lexical token."""
+
+    type: TokenType
+    value: str
+    line: int
+    column: int
+
+
+class Tokenizer:
+    """Lexical analyzer for ZX16 assembly language."""
+
+    def __init__(self, text: str):
+        self.text = text
+        self.pos = 0
+        self.line = 1
+        self.column = 1
+        self.tokens: List[Token] = []
+
+    def current_char(self) -> str:
+        """Get the current character."""
+        if self.pos >= len(self.text):
+            return ""
+        return self.text[self.pos]
+
+    def peek_char(self, offset: int = 1) -> str:
+        """Peek at character with offset."""
+        peek_pos = self.pos + offset
+        if peek_pos >= len(self.text):
+            return ""
+        return self.text[peek_pos]
+
+    def advance(self) -> None:
+        """Advance to the next character."""
+        if self.pos < len(self.text) and self.text[self.pos] == "\n":
+            self.line += 1
+            self.column = 1
+        else:
+            self.column += 1
+        self.pos += 1
+
+    def skip_whitespace(self) -> None:
+        """Skip whitespace except newlines."""
+        while self.current_char() in " \t\r":
+            self.advance()
+
+    def read_string(self) -> str:
+        """Read a string literal."""
+        result = ""
+        self.advance()  # Skip opening quote
+
+        while self.current_char() and self.current_char() != '"':
+            if self.current_char() == "\\":
+                self.advance()
+                escape_char = self.current_char()
+                escape_map = {"n": "\n", "t": "\t", "r": "\r", "\\": "\\", '"': '"'}
+                result += escape_map.get(escape_char, escape_char)
+            else:
+                result += self.current_char()
+            self.advance()
+
+        if self.current_char() == '"':
+            self.advance()  # Skip closing quote
+
+        return result
+
+    def read_number(self) -> int:
+        """Read a numeric literal."""
+        start_pos = self.pos
+
+        # Handle different number bases
+        if self.current_char() == "0" and self.peek_char():
+            self.advance()
+            if self.current_char().lower() == "x":
+                # Hexadecimal
+                self.advance()
+                while self.current_char().lower() in "0123456789abcdef":
+                    self.advance()
+                return int(self.text[start_pos : self.pos], 16)
+            elif self.current_char().lower() == "b":
+                # Binary
+                self.advance()
+                while self.current_char() in "01":
+                    self.advance()
+                return int(self.text[start_pos : self.pos], 2)
+            elif self.current_char().lower() == "o":
+                # Octal
+                self.advance()
+                while self.current_char() in "01234567":
+                    self.advance()
+                return int(self.text[start_pos : self.pos], 8)
+            else:
+                # Decimal starting with 0
+                self.pos = start_pos
+
+        # Decimal number
+        while self.current_char().isdigit():
+            self.advance()
+
+        return int(self.text[start_pos : self.pos])
+
+    def read_identifier(self) -> str:
+        """Read an identifier."""
+        start_pos = self.pos
+
+        while self.current_char().isalnum() or self.current_char() in "_":
+            self.advance()
+
+        return self.text[start_pos : self.pos]
+
+    def is_register(self, identifier: str) -> bool:
+        """Check if identifier is a register name."""
+        register_names = {
+            "x0",
+            "x1",
+            "x2",
+            "x3",
+            "x4",
+            "x5",
+            "x6",
+            "x7",
+            "t0",
+            "ra",
+            "sp",
+            "s0",
+            "s1",
+            "t1",
+            "a0",
+            "a1",
+        }
+        return identifier.lower() in register_names
+
+    def tokenize(self) -> List[Token]:
+        """Tokenize the input text."""
+        while self.pos < len(self.text):
+            self.skip_whitespace()
+
+            if not self.current_char():
+                break
+
+            line, column = self.line, self.column
+
+            # Handle newlines
+            if self.current_char() == "\n":
+                self.tokens.append(Token(TokenType.NEWLINE, "\n", line, column))
+                self.advance()
+
+                continue
+
+            # Handle comments
+            if self.current_char() == "#":
+                start_pos = self.pos
+                while self.current_char() and self.current_char() != "\n":
+                    self.advance()
+                comment_text = self.text[start_pos : self.pos]
+                self.tokens.append(Token(TokenType.COMMENT, comment_text, line, column))
+                continue
+
+            # Handle block comments
+            if self.current_char() == "/" and self.peek_char() == "*":
+                start_pos = self.pos
+                self.advance()  # Skip '/'
+                self.advance()  # Skip '*'
+                while self.pos < len(self.text) - 1:
+                    if self.current_char() == "*" and self.peek_char() == "/":
+                        self.advance()  # Skip '*'
+                        self.advance()  # Skip '/'
+                        break
+                    self.advance()
+                comment_text = self.text[start_pos : self.pos]
+                self.tokens.append(Token(TokenType.COMMENT, comment_text, line, column))
+                continue
+
+            # Handle single character tokens
+            char_tokens = {
+                ",": TokenType.COMMA,
+                ":": TokenType.COLON,
+                "(": TokenType.LPAREN,
+                ")": TokenType.RPAREN,
+            }
+
+            if self.current_char() in char_tokens:
+                token_type = char_tokens[self.current_char()]
+                self.tokens.append(Token(token_type, self.current_char(), line, column))
+                self.advance()
+                continue
+
+            # Handle string literals
+            if self.current_char() == '"':
+                string_value = self.read_string()
+                self.tokens.append(Token(TokenType.STRING, string_value, line, column))
+                continue
+
+            # Handle character literals
+            if self.current_char() == "'":
+                self.advance()  # Skip opening quote
+                char_value = 0
+                if self.current_char() == "\\":
+                    self.advance()
+                    escape_char = self.current_char()
+                    escape_map = {
+                        "n": ord("\n"),
+                        "t": ord("\t"),
+                        "r": ord("\r"),
+                        "\\": ord("\\"),
+                        "'": ord("'"),
+                    }
+                    char_value = escape_map.get(escape_char, ord(escape_char))
+                    self.advance()
+                else:
+                    char_value = ord(self.current_char())
+                    self.advance()
+
+                if self.current_char() == "'":
+                    self.advance()  # Skip closing quote
+
+                self.tokens.append(
+                    Token(TokenType.CHARACTER, str(char_value), line, column)
+                )
+                continue
+
+            # Handle negative numbers
+            if self.current_char() == "-" and self.peek_char().isdigit():
+                self.advance()  # Skip '-'
+                number_value = -self.read_number()
+                self.tokens.append(
+                    Token(TokenType.IMMEDIATE, str(number_value), line, column)
+                )
+                continue
+
+            # Handle numbers
+            if self.current_char().isdigit():
+                number_value = self.read_number()
+                self.tokens.append(
+                    Token(TokenType.IMMEDIATE, str(number_value), line, column)
+                )
+                continue
+
+            # Handle directives
+            if self.current_char() == ".":
+                start_pos = self.pos
+                self.advance()  # Skip '.'
+                identifier = self.read_identifier()
+                directive_name = self.text[start_pos : self.pos]
+                self.tokens.append(
+                    Token(TokenType.DIRECTIVE, directive_name, line, column)
+                )
+                continue
+
+            # Handle identifiers, labels, instructions, and registers
+            if self.current_char().isalpha() or self.current_char() == "_":
+                identifier = self.read_identifier()
+
+                # Check if it's followed by a colon (label)
+                old_pos = self.pos
+                self.skip_whitespace()
+                if self.current_char() == ":":
+                    self.advance()  # Consume the colon
+                    self.tokens.append(Token(TokenType.LABEL, identifier, line, column))
+                    continue
+                else:
+                    self.pos = old_pos  # Restore position
+
+                # Check if it's a register
+                if self.is_register(identifier):
+                    self.tokens.append(
+                        Token(TokenType.REGISTER, identifier, line, column)
+                    )
+                else:
+                    # Assume it's an instruction or symbol
+                    self.tokens.append(
+                        Token(TokenType.INSTRUCTION, identifier, line, column)
+                    )
+                continue
+
+            # Unknown character - skip it
+            self.advance()
+
+        self.tokens.append(Token(TokenType.EOF, "", self.line, self.column))
+        return self.tokens
