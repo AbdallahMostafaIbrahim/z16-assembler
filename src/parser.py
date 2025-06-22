@@ -26,6 +26,16 @@ class ZX16Parser:
             self.pos += 1
             self.current_token = self.tokens[self.pos]
 
+    def advance_and_delete(self) -> None:
+        """Advance to the next token and delete the current one."""
+        if self.pos < len(self.tokens) - 1:
+            self.tokens.pop(self.pos)
+            self.current_token = (
+                self.tokens[self.pos] if self.tokens else Token(TokenType.EOF, "", 1, 1)
+            )
+        else:
+            self.current_token = Token(TokenType.EOF, "", 1, 1)
+
     def peek(self, offset: int = 1) -> Token:
         """Peek at the next token without advancing."""
         if self.pos + offset < len(self.tokens):

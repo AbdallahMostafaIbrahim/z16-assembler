@@ -1,6 +1,37 @@
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, auto
 from typing import Literal
+
+
+class TokenType(Enum):
+    """Token types for lexical analysis."""
+
+    IDENTIFIER = auto()
+    REGISTER = auto()
+    IMMEDIATE = auto()
+    LABEL = auto()
+    DIRECTIVE = auto()
+    STRING = auto()
+    CHARACTER = auto()
+    NEWLINE = auto()
+    COMMA = auto()
+    LPAREN = auto()
+    RPAREN = auto()
+    OPERATOR = auto()
+    EOF = auto()
+
+
+@dataclass
+class Token:
+    """Represents a lexical token."""
+
+    type: TokenType
+    value: str
+    line: int
+    column: int
+
+
+SectionType = Literal[".text", ".data", ".bss", "const"]
 
 
 @dataclass
@@ -9,6 +40,7 @@ class Symbol:
 
     name: str
     value: int
+    section: SectionType
     defined: bool = False
     global_symbol: bool = False
     line: int = 0

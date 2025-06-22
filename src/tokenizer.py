@@ -1,40 +1,5 @@
-import argparse
-import re
-import sys
-import os
-from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import Dict, List, Optional, Tuple, Union, Any
-from pathlib import Path
-
-
-class TokenType(Enum):
-    """Token types for lexical analysis."""
-
-    INSTRUCTION = auto()
-    REGISTER = auto()
-    IMMEDIATE = auto()
-    LABEL = auto()
-    DIRECTIVE = auto()
-    STRING = auto()
-    CHARACTER = auto()
-    COMMENT = auto()
-    NEWLINE = auto()
-    COMMA = auto()
-    COLON = auto()
-    LPAREN = auto()
-    RPAREN = auto()
-    EOF = auto()
-
-
-@dataclass
-class Token:
-    """Represents a lexical token."""
-
-    type: TokenType
-    value: str
-    line: int
-    column: int
+from typing import List
+from utils import Token, TokenType
 
 
 class Tokenizer:
@@ -182,8 +147,8 @@ class Tokenizer:
                 start_pos = self.pos
                 while self.current_char() and self.current_char() != "\n":
                     self.advance()
-                comment_text = self.text[start_pos : self.pos]
-                self.tokens.append(Token(TokenType.COMMENT, comment_text, line, column))
+                # For simplicity, we ignore comments entirely
+                # comment_text = self.text[start_pos : self.pos]
                 continue
 
             # Handle block comments
@@ -197,16 +162,24 @@ class Tokenizer:
                         self.advance()  # Skip '/'
                         break
                     self.advance()
-                comment_text = self.text[start_pos : self.pos]
-                self.tokens.append(Token(TokenType.COMMENT, comment_text, line, column))
+                # For simplicity, we ignore block comments entirely
+                # comment_text = self.text[start_pos : self.pos]
                 continue
 
             # Handle single character tokens
             char_tokens = {
                 ",": TokenType.COMMA,
-                ":": TokenType.COLON,
                 "(": TokenType.LPAREN,
                 ")": TokenType.RPAREN,
+                "+": TokenType.OPERATOR,
+                "-": TokenType.OPERATOR,
+                "*": TokenType.OPERATOR,
+                "/": TokenType.OPERATOR,
+                "%": TokenType.OPERATOR,
+                "^": TokenType.OPERATOR,
+                "|": TokenType.OPERATOR,
+                "&": TokenType.OPERATOR,
+                "~": TokenType.OPERATOR,
             }
 
             if self.current_char() in char_tokens:
@@ -271,9 +244,8 @@ class Tokenizer:
                 start_pos = self.pos
                 self.advance()  # Skip '.'
                 identifier = self.read_identifier()
-                directive_name = self.text[start_pos : self.pos]
                 self.tokens.append(
-                    Token(TokenType.DIRECTIVE, directive_name, line, column)
+                    Token(TokenType.DIRECTIVE, f".{identifier}", line, column)
                 )
                 continue
 
@@ -282,14 +254,13 @@ class Tokenizer:
                 identifier = self.read_identifier()
 
                 # Check if it's followed by a colon (label)
-                old_pos = self.pos
                 self.skip_whitespace()
                 if self.current_char() == ":":
                     self.advance()  # Consume the colon
                     self.tokens.append(Token(TokenType.LABEL, identifier, line, column))
+                    self.tokens.append(Token(TokenType.NEWLINE, "\n", line, column))
                     continue
-                else:
-                    self.pos = old_pos  # Restore position
+                # TODO: I might've messed up here
 
                 # Check if it's a register
                 if self.is_register(identifier):
@@ -297,14 +268,14 @@ class Tokenizer:
                         Token(TokenType.REGISTER, identifier, line, column)
                     )
                 else:
-                    # Assume it's an instruction or symbol
+                    # Assume it's an instruction or symbol (identifier)
                     self.tokens.append(
-                        Token(TokenType.INSTRUCTION, identifier, line, column)
+                        Token(TokenType.IDENTIFIER, identifier, line, column)
                     )
                 continue
 
-            # Unknown character - skip it
-            self.advance()
+            # Unknown character - throw an error
+            raise ValueError(f"Unknown character '{self.current_char()}'")
 
         self.tokens.append(Token(TokenType.EOF, "", self.line, self.column))
         return self.tokens
