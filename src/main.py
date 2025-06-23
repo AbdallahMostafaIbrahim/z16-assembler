@@ -1,148 +1,38 @@
 import argparse
 import sys
-from typing import Dict, List
-from utils import AssemblerMessage, Symbol, Token
+from error_handler import Zx16Errors
 from tokenizer import Tokenizer, TokenType
-from parser import ZX16Parser
-from constants import TRUE_INSTRUCTIONS, PSEUDO_INSTRUCTIONS
+from first_pass_parser import ZX16FirstPassParser
+from second_pass_encoder import ZX16SecondPassEncoder
 
-  
 
 class ZX16Assembler:
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
-        self.errors: List[AssemblerMessage] = []
-        self.warnings: List[AssemblerMessage] = []
-        self.symbol_table: Dict[str, Symbol] = {}
-        self.parser: ZX16Parser = None
-        self.data = bytearray(65536)  # Data to be assembled (64KB)
 
-    def add_error(
-        self,
-        message: str,
-        line: int,
-        column: int = 0,
-    ) -> None:
-        """Add an error to the error list."""
-        self.errors.append(AssemblerMessage(message, line, column))
-
-    def add_warning(
-        self,
-        message: str,
-        line: int,
-        column: int = 0,
-    ) -> None:
-        """Add a warning to the warning list."""
-        self.warnings.append(AssemblerMessage(message, line, column))
-
-    def print_errors(self) -> None:
-        """Print all errors and warnings."""
-        for error in self.errors:
-            print(f"Error at line {error.line}: {error.message}", file=sys.stderr)
-
-        for warning in self.warnings:
-            print(f"Warning at line {warning.line}: {warning.message}", file=sys.stderr)
-
-        if self.errors:
-            print(
-                f"\nAssembly failed with {len(self.errors)} errors, {len(self.warnings)} warnings.",
-                file=sys.stderr,
-            )
-        elif self.warnings:
-            print(f"\nAssembly completed with {len(self.warnings)} warnings.")
-        else:
-            print("Assembly completed successfully.")
-
-    def pass1(self):
-        """First pass of the assembler."""
-        p = self.parser
-
-        # Fill the symbol tables with the constants using .equ and .set directives
-        while p.current_token.type != TokenType.EOF:
-            if p.current_token.type == TokenType.DIRECTIVE:
-                if p.current_token.value in [".equ", ".set"]:
-                    p.parse_constant()
-            p.advance()
-         # adding constants to the symbol table
-        self.symbol_table= p.symbol_table
-         # TODO: Handle ifs
-        # Another Loop
-        p.reset()
-        while p.current_token.type != TokenType.EOF:
-            if p.current_token.type == TokenType.LABEL:
-                p.parse_label()
-            elif p.current_token.type == TokenType.IDENTIFIER:
-                potential = p.current_token.value.lower()
-                # TODO: For now, we can add instructions in any section
-                if potential in TRUE_INSTRUCTIONS:
-                    p.pointer_advance(2)
-                elif potential in PSEUDO_INSTRUCTIONS:
-                    p.pointer_advance(PSEUDO_INSTRUCTIONS[potential])
-
-                # Keep advancing until we find a new line
-                while p.peek().type not in [TokenType.NEWLINE, TokenType.EOF]:
-                    p.advance()
-                p.advance()
-
-            elif p.current_token.type == TokenType.DIRECTIVE:
-                p.parse_directive()
-            
-            #Syntax errors
-            if p.current_token.type not in [TokenType.NEWLINE, TokenType.EOF]:
-                self.add_error(
-                    f"Unexpected token '{p.current_token.value}'",
-                    p.current_token.line,
-                    p.current_token.column,
-                )
-
-            p.advance()
-
-    def pass2(self):
-        for line in self.parser.lines:
-            if line[0] == TokenType.EOF:
-                break
-            if line[0] == TokenType.DIRECTIVE:
-                pass
-            elif line[0] == TokenType.IDENTIFIER:
-                pass
-
-    
     def assemble(self, source_code: str, filename: str) -> bool:
         """Assemble the given source code."""
         tokenizer = Tokenizer(source_code)
-        try:
-            tokens = tokenizer.tokenize()
-        except Exception as e:
-            self.add_error(f"Tokenization error: {e}", tokenizer.line, tokenizer.column)
+
+        tokens = tokenizer.tokenize()
+        if Zx16Errors.has_errors():
             return False
 
-        self.parser = ZX16Parser(tokens)
+        pass1 = ZX16FirstPassParser(tokens)
+        result = pass1.execute()
+        if Zx16Errors.has_errors():
+            return False
 
-        self.pass1()
-
-        # for token in tokens:
-        #     if token.type == TokenType.NEWLINE:
-        #         print(f"")
-        #     else:
-        #         print(
-        #             f"Token: {token.type} - {token.value} at line {token.line}, column {token.column}"
-                # )
-        self.parser.calculate_memory_layout()
-        self.parser.lionize()
-        # Print parsed lines for debugging
-        
-        # self.parser.reset()  # Reset parser for second pass
-        # self.pass2()
+        pass2 = ZX16SecondPassEncoder(result)
+        pass2.execute()
 
         # If verbose, print the symbol table
         if self.verbose:
-            for line_number, line in enumerate(self.parser.lines, start=1):
-                if line[0] == TokenType.EOF:
-                    break
-                print(f"Line {line_number}: {[token.value for token in line]}")
             print("Symbol Table:")
-            for name, symbol in self.symbol_table.items():
-                print(f"{name}: {symbol.value} (section: {symbol.section})")
+            for name, symbol in result.symbol_table.items():
+                print(
+                    f"{name}: {symbol.value + result.memory_layout.get(symbol.section, 0)} (section: {symbol.section})"
+                )
 
         return True
 
@@ -188,7 +78,7 @@ def main():
     success = assembler.assemble(source_code, args.input)
 
     # Print errors/warnings
-    assembler.print_errors()
+    Zx16Errors.print_errors()
 
     if not success:
         return 1

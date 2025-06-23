@@ -1,5 +1,6 @@
 from typing import List
-from utils import Token, TokenType
+from definitions import Token, TokenType
+from error_handler import Zx16Errors
 
 
 class Tokenizer:
@@ -103,27 +104,23 @@ class Tokenizer:
 
         return self.text[start_pos : self.pos]
 
-    def is_register(self, identifier: str) -> bool:
+    def get_register(self, identifier: str) -> str:
         """Check if identifier is a register name."""
         register_names = {
-            "x0",
-            "x1",
-            "x2",
-            "x3",
-            "x4",
-            "x5",
-            "x6",
-            "x7",
-            "t0",
-            "ra",
-            "sp",
-            "s0",
-            "s1",
-            "t1",
-            "a0",
-            "a1",
+            "t0": "x0",
+            "ra": "x1",
+            "sp": "x2",
+            "s0": "x3",
+            "s1": "x4",
+            "t1": "x5",
+            "a0": "x6",
+            "a1": "x7",
         }
-        return identifier.lower() in register_names
+        if identifier in register_names.values():
+            return identifier
+        if identifier in register_names:
+            return register_names[identifier]
+        return ""
 
     def tokenize(self) -> List[Token]:
         """Tokenize the input text."""
@@ -164,6 +161,22 @@ class Tokenizer:
                     self.advance()
                 # For simplicity, we ignore block comments entirely
                 # comment_text = self.text[start_pos : self.pos]
+                continue
+            # Handle negative numbers
+            if self.current_char() == "-" and self.peek_char().isdigit():
+                self.advance()  # Skip '-'
+                number_value = -self.read_number()
+                self.tokens.append(
+                    Token(TokenType.IMMEDIATE, str(number_value), line, column)
+                )
+                continue
+
+            # Handle numbers
+            if self.current_char().isdigit():
+                number_value = self.read_number()
+                self.tokens.append(
+                    Token(TokenType.IMMEDIATE, str(number_value), line, column)
+                )
                 continue
 
             # Handle single character tokens
@@ -222,23 +235,6 @@ class Tokenizer:
                 )
                 continue
 
-            # Handle negative numbers
-            if self.current_char() == "-" and self.peek_char().isdigit():
-                self.advance()  # Skip '-'
-                number_value = -self.read_number()
-                self.tokens.append(
-                    Token(TokenType.IMMEDIATE, str(number_value), line, column)
-                )
-                continue
-
-            # Handle numbers
-            if self.current_char().isdigit():
-                number_value = self.read_number()
-                self.tokens.append(
-                    Token(TokenType.IMMEDIATE, str(number_value), line, column)
-                )
-                continue
-
             # Handle directives
             if self.current_char() == ".":
                 start_pos = self.pos
@@ -263,9 +259,14 @@ class Tokenizer:
                 # TODO: I might've messed up here
 
                 # Check if it's a register
-                if self.is_register(identifier):
+                if self.get_register(identifier) != "":
                     self.tokens.append(
-                        Token(TokenType.REGISTER, identifier, line, column)
+                        Token(
+                            TokenType.REGISTER,
+                            self.get_register(identifier),
+                            line,
+                            column,
+                        )
                     )
                 else:
                     # Assume it's an instruction or symbol (identifier)
@@ -275,7 +276,10 @@ class Tokenizer:
                 continue
 
             # Unknown character - throw an error
-            raise ValueError(f"Unknown character '{self.current_char()}'")
+            Zx16Errors.add_error(
+                f"Unknown character '{self.current_char()}'", line, column
+            )
+            self.advance()
 
         self.tokens.append(Token(TokenType.EOF, "EOF", self.line, self.column))
         return self.tokens
