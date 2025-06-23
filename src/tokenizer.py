@@ -277,5 +277,5 @@ class Tokenizer:
             # Unknown character - throw an error
             raise ValueError(f"Unknown character '{self.current_char()}'")
 
-        self.tokens.append(Token(TokenType.EOF, "", self.line, self.column))
+        self.tokens.append(Token(TokenType.EOF, "EOF", self.line, self.column))
         return self.tokens
