@@ -35,59 +35,6 @@ class Opcode(Enum):
     SYS_TYPE = 0b111
 
 
-TRUE_INSTRUCTIONS = {
-    # R-Type
-    "add": Opcode.R_TYPE,
-    "sub": Opcode.R_TYPE,
-    "slt": Opcode.R_TYPE,
-    "sltu": Opcode.R_TYPE,
-    "sll": Opcode.R_TYPE,
-    "srl": Opcode.R_TYPE,
-    "sra": Opcode.R_TYPE,
-    "or": Opcode.R_TYPE,
-    "and": Opcode.R_TYPE,
-    "xor": Opcode.R_TYPE,
-    "mv": Opcode.R_TYPE,
-    "jr": Opcode.R_TYPE,
-    "jalr": Opcode.R_TYPE,
-    # I-Type
-    "addi": Opcode.I_TYPE,
-    "slti": Opcode.I_TYPE,
-    "sltui": Opcode.I_TYPE,
-    "slli": Opcode.I_TYPE,
-    "srli": Opcode.I_TYPE,
-    "srai": Opcode.I_TYPE,
-    "ori": Opcode.I_TYPE,
-    "andi": Opcode.I_TYPE,
-    "xori": Opcode.I_TYPE,
-    "li": Opcode.I_TYPE,
-    # B-Type
-    "beq": Opcode.B_TYPE,
-    "bne": Opcode.B_TYPE,
-    "bz": Opcode.B_TYPE,
-    "bnz": Opcode.B_TYPE,
-    "blt": Opcode.B_TYPE,
-    "bge": Opcode.B_TYPE,
-    "bltu": Opcode.B_TYPE,
-    "bgeu": Opcode.B_TYPE,
-    # S-Type
-    "sb": Opcode.S_TYPE,
-    "sw": Opcode.S_TYPE,
-    # L-Type
-    "lb": Opcode.L_TYPE,
-    "lw": Opcode.L_TYPE,
-    "lbu": Opcode.L_TYPE,
-    # J-Type
-    "j": Opcode.J_TYPE,
-    "jal": Opcode.J_TYPE,
-    # U-Type
-    "lui": Opcode.U_TYPE,
-    "auipc": Opcode.U_TYPE,
-    # SYS-Type
-    "ecall": Opcode.SYS_TYPE,
-}
-
-
 @dataclass
 class MemoryAllocation:
     # Memory allocation
@@ -108,7 +55,6 @@ class Placeholder:
     allocations: List[MemoryAllocation] = None
     beginning: int = 0
     end: int = 0
-    # TODO: add immediate value range
 
 
 INSTRUCTION_FORMAT = {

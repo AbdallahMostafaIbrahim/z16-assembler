@@ -5,7 +5,6 @@ from definitions import Symbol, SectionType
 from error_handler import Zx16Errors
 from constants import (
     DEFAULT_SYMBOLS,
-    TRUE_INSTRUCTIONS,
     PSEUDO_INSTRUCTIONS,
     INSTRUCTION_FORMAT,
 )
@@ -31,13 +30,6 @@ class ZX16SecondPassEncoder:
 
         self.memory = bytearray(65536)  # Data to be assembled (64KB)
 
-    def advance_pointer(self, size=2) -> None:
-        """Advance the section pointer by the given size."""
-        if self.current_section in self.section_pointers:
-            self.section_pointers[self.current_section] += size
-        else:
-            Zx16Errors.add_error(f"Unknown section: {self.current_section}", 0, 0)
-
     def lionize(self) -> None:
         """Convert tokens into lines for processing."""
         current_line: List[Token] = []
@@ -57,7 +49,7 @@ class ZX16SecondPassEncoder:
                 continue
 
             # Skip any instructions
-            if token.value in TRUE_INSTRUCTIONS or token.value in PSEUDO_INSTRUCTIONS:
+            if token.value in INSTRUCTION_FORMAT or token.value in PSEUDO_INSTRUCTIONS:
                 continue
 
             # Resolve symbols in the symbol table
@@ -73,6 +65,76 @@ class ZX16SecondPassEncoder:
                 )
                 token.type = TokenType.IMMEDIATE
                 token.value = "0"
+
+    def resolve_pseudo_instructions(self):
+        """Expand psuedo instruction like
+        i16, la, push, pop, call, ret, inc, dec, neg, not, clr, nop
+        to true instructions"""
+        i = 0
+        while i < len(self.lines):
+            line = self.lines[i]
+            if (
+                line[0].type == TokenType.IDENTIFIER
+                and line[0].value.lower() in PSEUDO_INSTRUCTIONS
+            ):
+                if line[0].value == "li16":
+                    # li16 $r, imm
+                    if (
+                        len(line) != 4
+                        or line[1].type != TokenType.REGISTER
+                        or line[2].type != TokenType.COMMA
+                        or line[3].type != TokenType.IMMEDIATE
+                    ):
+                        Zx16Errors.add_error(
+                            f"Invalid li16 instruction: {line}",
+                            line[0].line,
+                            line[0].column,
+                        )
+                        i += 1
+                        continue
+                    reg = int(line[1].value[1])
+                    value = int(line[3].value, 0)
+
+                    # Create LUI instruction for upper 9 bits
+                    lui_line = [
+                        Token(
+                            TokenType.IDENTIFIER, "lui", line[0].line, line[0].column
+                        ),
+                        Token(
+                            TokenType.REGISTER, f"${reg}", line[0].line, line[0].column
+                        ),
+                        Token(TokenType.COMMA, ",", line[0].line, line[0].column),
+                        Token(
+                            TokenType.IMMEDIATE,
+                            str(value >> 7),
+                            line[0].line,
+                            line[0].column,
+                        ),
+                    ]
+
+                    # Create ORI instruction for lower 7 bits
+                    ori_line = [
+                        Token(
+                            TokenType.IDENTIFIER, "ori", line[0].line, line[0].column
+                        ),
+                        Token(
+                            TokenType.REGISTER, f"${reg}", line[0].line, line[0].column
+                        ),
+                        Token(TokenType.COMMA, ",", line[0].line, line[0].column),
+                        Token(
+                            TokenType.IMMEDIATE,
+                            str(value & 0x7F),
+                            line[0].line,
+                            line[0].column,
+                        ),
+                    ]
+
+                    # Replace current line with the two new lines
+                    self.lines[i] = lui_line
+                    self.lines.insert(i + 1, ori_line)
+                    i += 1  # Skip the inserted ORI line in next iteration
+
+            i += 1
 
     def write_memory(self, value: int, size: int) -> None:
         """Write a value to the memory at the specified address."""
@@ -134,17 +196,32 @@ class ZX16SecondPassEncoder:
                     for _ in range(fill_size):
                         self.write_memory(fill_value, fill_size)
 
+    def check_range(self, value: int, instr: str, opcode: str) -> bool:
+        if opcode == "001":  # I-type instructions
+            if instr in ["slli", "srli", "srai"]:
+                return -8 <= value <= 7
+            return -64 <= value <= 63
+        elif opcode == "010":
+            return -8 <= value / 2 <= 7
+        elif opcode == "011":
+            return -8 <= value <= 7
+        elif opcode == "101":
+            return -256 <= value / 2 <= 255
+        elif opcode == "110":  # u
+            return 0 <= value <= 511
+        else:
+            return True  # For R-type instructions, we assume no range check is needed
+
     def encode_instruction(self, line: List[Token]) -> None:
         """Encode an instruction line."""
         instruction = line[0].value.lower()
         if instruction in INSTRUCTION_FORMAT:
             word = 0
             placeholders = INSTRUCTION_FORMAT[instruction]
-
+            opcode = placeholders[0].const_value
             for placeholder in placeholders:
                 if placeholder.const_value:
                     word |= int(placeholder.const_value, 2) << placeholder.beginning
-
             tokenPointer = 1
             placeholderPointer = 0
             while tokenPointer < len(line) and placeholderPointer < len(placeholders):
@@ -155,9 +232,17 @@ class ZX16SecondPassEncoder:
                     continue
                 if token.type == placeholder.expected_token:
                     if placeholder.expected_token == TokenType.IMMEDIATE:
+                        # check ranges
                         value = int(token.value, 0)
                         if token.was_label:
                             value -= self.section_pointers[self.current_section]
+                        if not self.check_range(value, instruction, opcode):
+                            Zx16Errors.add_error(
+                                f"Immediate value {value} out of range for instruction {instruction}",
+                                token.line,
+                                token.column,
+                            )
+                            return
                         if placeholder.allocations:
                             for allocation in placeholder.allocations:
                                 masked = (
@@ -194,7 +279,6 @@ class ZX16SecondPassEncoder:
                     tokenPointer += 1
                     placeholderPointer += 1
                     continue
-
                 Zx16Errors.add_error(
                     f"Expected token {placeholder.expected_token} but got {token.type} for instruction {instruction}",
                     token.line,
@@ -208,6 +292,7 @@ class ZX16SecondPassEncoder:
     def execute(self):
         self.resolve_symbols()
         self.lionize()
+        self.resolve_pseudo_instructions()
         for line in self.lines:
             print(f"Processing line: {[token.value for token in line]}")
             if line[0].type == TokenType.EOF:

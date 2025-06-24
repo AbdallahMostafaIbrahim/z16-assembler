@@ -3,7 +3,7 @@ from tokenizer import TokenType, Token
 from typing import Dict, List, Literal
 from definitions import Symbol, SectionType
 from error_handler import Zx16Errors
-from constants import DEFAULT_SYMBOLS, TRUE_INSTRUCTIONS, PSEUDO_INSTRUCTIONS
+from constants import DEFAULT_SYMBOLS, PSEUDO_INSTRUCTIONS, INSTRUCTION_FORMAT
 from dataclasses import dataclass
 
 
@@ -348,11 +348,11 @@ class ZX16FirstPassParser:
         while self.current_token.type != TokenType.EOF:
             if self.current_token.type == TokenType.LABEL:
                 self.parse_label()
-            # TODO : PASRSE it
+            # TODO : Parse it in a function
             elif self.current_token.type == TokenType.IDENTIFIER:
                 potential = self.current_token.value.lower()
                 # TODO: For now, we can add instructions in any section
-                if potential in TRUE_INSTRUCTIONS:
+                if potential in INSTRUCTION_FORMAT:
                     self.pointer_advance(2)
                 elif potential in PSEUDO_INSTRUCTIONS:
                     self.pointer_advance(PSEUDO_INSTRUCTIONS[potential])
