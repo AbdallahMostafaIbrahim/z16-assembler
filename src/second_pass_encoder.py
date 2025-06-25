@@ -7,6 +7,9 @@ from constants import (
     DEFAULT_SYMBOLS,
     PSEUDO_INSTRUCTIONS,
     INSTRUCTION_FORMAT,
+    ConstantField,
+    ImmediateField,
+    PunctuationField,
 )
 from dataclasses import dataclass
 from first_pass_parser import FirstPassResult
@@ -140,12 +143,11 @@ class ZX16SecondPassEncoder:
         """Write a value to the memory at the specified address."""
         address = self.section_pointers[self.current_section]
 
+        # Little endian encoding
         if 0 <= address < len(self.memory):
-            # zext
             if size == 1:
                 self.memory[address] = value & 0xFF
             else:
-                # litte endian
                 self.memory[address] = value & 0xFF
                 for i in range(1, size):
                     self.memory[address + i] = (value >> 8) & 0xFF
@@ -213,93 +215,157 @@ class ZX16SecondPassEncoder:
             return True  # For R-type instructions, we assume no range check is needed
 
     def encode_instruction(self, line: List[Token]) -> None:
-        """Encode an instruction line."""
-        instruction = line[0].value.lower()
-        if instruction in INSTRUCTION_FORMAT:
-            word = 0
-            placeholders = INSTRUCTION_FORMAT[instruction]
-            opcode = placeholders[0].const_value
-            for placeholder in placeholders:
-                if placeholder.const_value:
-                    word |= int(placeholder.const_value, 2) << placeholder.beginning
-            tokenPointer = 1
-            placeholderPointer = 0
-            while tokenPointer < len(line) and placeholderPointer < len(placeholders):
-                token = line[tokenPointer]
-                placeholder = placeholders[placeholderPointer]
-                if placeholder.const_value:
-                    placeholderPointer += 1
-                    continue
-                if token.type == placeholder.expected_token:
-                    if placeholder.expected_token == TokenType.IMMEDIATE:
-                        # check ranges
-                        value = int(token.value, 0)
-                        if token.was_label:
-                            value -= self.section_pointers[self.current_section]
-                        if not self.check_range(value, instruction, opcode):
-                            Zx16Errors.add_error(
-                                f"Immediate value {value} out of range for instruction {instruction}",
-                                token.line,
-                                token.column,
-                            )
-                            return
-                        if placeholder.allocations:
-                            for allocation in placeholder.allocations:
-                                masked = (
-                                    value
-                                    & (
-                                        int(
-                                            "1"
-                                            * (
-                                                allocation.i_end
-                                                - allocation.i_beginning
-                                                + 1
-                                            ),
-                                            2,
-                                        )
-                                        << allocation.i_beginning
-                                    )
-                                ) >> allocation.i_beginning
+        """Encode an instruction line, reporting errors via Zx16Errors."""
+        mnemonic = line[0].value.lower()
+        if mnemonic not in INSTRUCTION_FORMAT:
+            Zx16Errors.add_error(
+                f"Unknown instruction '{mnemonic}'", line[0].line, line[0].column
+            )
+            return
 
-                                word |= masked << allocation.m_beginning
-                        else:
-                            word |= value << placeholder.beginning
+        specs = INSTRUCTION_FORMAT[mnemonic]
+        word = 0
 
-                    elif placeholder.expected_token == TokenType.REGISTER:
-                        reg_index = int(token.value[1])
-                        if reg_index < 0 or reg_index > 7:
-                            Zx16Errors.add_error(
-                                f"Invalid register {token.value}",
-                                token.line,
-                                token.column,
-                            )
-                            return
-                        word |= reg_index << placeholder.beginning
+        # 1) Lay down all constants
+        for field in specs:
+            if isinstance(field, ConstantField):
+                word |= int(field.const_value, 2) << field.beginning
 
-                    tokenPointer += 1
-                    placeholderPointer += 1
-                    continue
+        # 2) Consume tokens for punctuation, registers, immediates
+        token_idx = 1
+        for field in specs:
+            if isinstance(field, ConstantField):
+                continue  # already handled
+
+            if token_idx >= len(line):
                 Zx16Errors.add_error(
-                    f"Expected token {placeholder.expected_token} but got {token.type} for instruction {instruction}",
-                    token.line,
-                    token.column,
+                    f"Missing token for field {field}", line[-1].line, line[-1].column
                 )
                 return
-            self.write_memory(word, 2)
+            token = line[token_idx]
 
-        # For now, we assume all instructions are 2 bytes long
+            # --- punctuation ---
+            if isinstance(field, PunctuationField):
+                if token.type is not field.expected_token:
+                    Zx16Errors.add_error(
+                        f"Expected punctuation {field.expected_token}, got {token.type}",
+                        token.line,
+                        token.column,
+                    )
+                    return
+                token_idx += 1
+                continue
+
+            # --- register operand ---
+            if field.expected_token == TokenType.REGISTER:
+                if token.type is not TokenType.REGISTER:
+                    Zx16Errors.add_error(
+                        f"Expected REGISTER, got {token.type} for '{mnemonic}'",
+                        token.line,
+                        token.column,
+                    )
+                    return
+                try:
+                    reg_index = int(token.value[1])
+                except (IndexError, ValueError):
+                    Zx16Errors.add_error(
+                        f"Invalid register syntax '{token.value}'",
+                        token.line,
+                        token.column,
+                    )
+                    return
+                if not (0 <= reg_index <= 7):
+                    Zx16Errors.add_error(
+                        f"Register index {reg_index} out of range (0–7)",
+                        token.line,
+                        token.column,
+                    )
+                    return
+                word |= reg_index << field.beginning
+                token_idx += 1
+                continue
+
+            # --- immediate operand ---
+            # ImmediateField inherits from OperandField and carries min_value/max_value
+            if isinstance(field, ImmediateField):
+                if token.type is not TokenType.IMMEDIATE:
+                    Zx16Errors.add_error(
+                        f"Expected IMMEDIATE, got {token.type} for '{mnemonic}'",
+                        token.line,
+                        token.column,
+                    )
+                    return
+                # parse
+                try:
+                    imm = int(token.value, 0)
+                except ValueError:
+                    Zx16Errors.add_error(
+                        f"Invalid immediate '{token.value}'", token.line, token.column
+                    )
+                    return
+
+                # label resolution
+                if token.was_label:
+                    imm -= self.section_pointers[self.current_section]
+
+                # range check against the field’s own bounds
+                if not (field.min_value <= imm <= field.max_value):
+                    if token.was_label:
+                        Zx16Errors.add_error(
+                            f"Label out of range [{field.min_value}..{field.max_value}]",
+                            token.line,
+                            token.column,
+                        )
+                    else:
+                        Zx16Errors.add_error(
+                            f"Immediate {imm} out of range [{field.min_value}..{field.max_value}]",
+                            token.line,
+                            token.column,
+                        )
+                    return
+
+                # encode: split or contiguous
+                if field.allocations:
+                    for alloc in field.allocations:
+                        width = alloc.i_end - alloc.i_beginning + 1
+                        mask = ((1 << width) - 1) << alloc.i_beginning
+                        piece = (imm & mask) >> alloc.i_beginning
+                        word |= piece << alloc.m_beginning
+                else:
+                    word |= (
+                        imm & ((1 << (field.end - field.beginning + 1)) - 1)
+                    ) << field.beginning
+
+                token_idx += 1
+                continue
+
+            # If we get here, it’s an unexpected field type
+            Zx16Errors.add_error(
+                f"Unhandled field type {type(field).__name__} in '{mnemonic}'",
+                token.line,
+                token.column,
+            )
+            return
+
+        # 3) Write out the two-byte instruction
+        self.write_memory(word, 2)
+        print(
+            f"Encoded {mnemonic}: 0x{word:04x} @ {self.current_section}:{self.section_pointers[self.current_section]}"
+        )
 
     def execute(self):
         self.resolve_symbols()
         self.lionize()
         self.resolve_pseudo_instructions()
+
         for line in self.lines:
             print(f"Processing line: {[token.value for token in line]}")
-            if line[0].type == TokenType.EOF:
+            # Look at the first token to determine the type of line
+            if line[0].type == TokenType.EOF:  # End of file
                 break
-            elif line[0].type == TokenType.DIRECTIVE:
+            elif line[0].type == TokenType.DIRECTIVE:  # Directive line
                 self.encode_directive(line)
-            elif line[0].type == TokenType.IDENTIFIER:
+            elif line[0].type == TokenType.IDENTIFIER:  # Instruction line
                 self.encode_instruction(line)
         # Write memory to binary file
         with open("output.bin", "wb") as f:
