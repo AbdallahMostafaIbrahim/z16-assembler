@@ -136,7 +136,6 @@ class Tokenizer:
             if self.current_char() == "\n":
                 self.tokens.append(Token(TokenType.NEWLINE, "\n", line, column))
                 self.advance()
-
                 continue
 
             # Handle comments
@@ -144,8 +143,7 @@ class Tokenizer:
                 start_pos = self.pos
                 while self.current_char() and self.current_char() != "\n":
                     self.advance()
-                # For simplicity, we ignore comments entirely
-                # comment_text = self.text[start_pos : self.pos]
+                # For simplicity, we ignore comments entirely 
                 continue
 
             # Handle block comments
@@ -160,7 +158,6 @@ class Tokenizer:
                         break
                     self.advance()
                 # For simplicity, we ignore block comments entirely
-                # comment_text = self.text[start_pos : self.pos]
                 continue
             # Handle negative numbers
             if self.current_char() == "-" and self.peek_char().isdigit():
@@ -256,7 +253,6 @@ class Tokenizer:
                     self.tokens.append(Token(TokenType.LABEL, identifier, line, column))
                     self.tokens.append(Token(TokenType.NEWLINE, "\n", line, column))
                     continue
-                # TODO: I might've messed up here
 
                 # Check if it's a register
                 if self.get_register(identifier) != "":

@@ -1,11 +1,18 @@
 import sys
 from typing import List
-from definitions import AssemblerMessage
+from dataclasses import dataclass
+
+@dataclass
+class AssemblerMessage:
+    """Represents an assembly error or warning."""
+
+    message: str
+    line: int
+    column: int
 
 
 class Zx16Errors(object):
     """Class to manage errors and warnings in the ZX16 assembler."""
-
     errors: List[AssemblerMessage] = []
     warnings: List[AssemblerMessage] = []
 

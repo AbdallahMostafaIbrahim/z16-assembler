@@ -1,25 +1,16 @@
 from typing import List
 from tokenizer import TokenType, Token
 from typing import Dict, List, Literal
-from definitions import Symbol, SectionType
+from definitions import Symbol, SectionType , FirstPassResult
 from error_handler import Zx16Errors
 from constants import DEFAULT_SYMBOLS, PSEUDO_INSTRUCTIONS, INSTRUCTION_FORMAT
-from dataclasses import dataclass
-
-
-@dataclass
-class FirstPassResult:
-    """Contains the results of the first pass parsing."""
-
-    tokens: List[Token]
-    symbol_table: Dict[str, Symbol]
-    memory_layout: Dict[str, int]
 
 
 class ZX16FirstPassParser:
     """Parser for ZX16 assembly language."""
 
-    def __init__(self, tokens: List[Token]):
+    def __init__(self, tokens: List[Token],verbose: bool = False):
+        self.verbose = verbose
         self.tokens = tokens
         self.symbol_table: Dict[str, Symbol] = {}
         self.pos = 0
@@ -322,10 +313,22 @@ class ZX16FirstPassParser:
                 f"Unknown directive '{directive}'", self.current_token.line
             )
             self.advance()
-
+    
+    def parse_identifier(self):
+                potential = self.current_token.value.lower()
+                if potential in INSTRUCTION_FORMAT:
+                    self.pointer_advance(2)
+                elif potential in PSEUDO_INSTRUCTIONS:
+                    self.pointer_advance(PSEUDO_INSTRUCTIONS[potential])
+                # Keep advancing until we find a new line
+                while self.current_token.type not in [TokenType.NEWLINE, TokenType.EOF]:
+                    if self.current_token.type == TokenType.CHARACTER:
+                        self.current_token.type = TokenType.IMMEDIATE
+                    self.advance()
+    
     def calculate_memory_layout(self):
         self.memory_layout[".data"] = (
-            self.section_pointers[".text"] + DEFAULT_SYMBOLS["CODE_START"]
+            self.memory_layout[".text"] + self.section_pointers[".text"] 
         )
         self.memory_layout[".bss"] = (
             self.memory_layout[".data"] + self.section_pointers[".data"]
@@ -348,21 +351,8 @@ class ZX16FirstPassParser:
         while self.current_token.type != TokenType.EOF:
             if self.current_token.type == TokenType.LABEL:
                 self.parse_label()
-            # TODO : Parse it in a function
             elif self.current_token.type == TokenType.IDENTIFIER:
-                potential = self.current_token.value.lower()
-                # TODO: For now, we can add instructions in any section
-                if potential in INSTRUCTION_FORMAT:
-                    self.pointer_advance(2)
-                elif potential in PSEUDO_INSTRUCTIONS:
-                    self.pointer_advance(PSEUDO_INSTRUCTIONS[potential])
-
-                # Keep advancing until we find a new line
-                while self.current_token.type not in [TokenType.NEWLINE, TokenType.EOF]:
-                    if self.current_token.type == TokenType.CHARACTER:
-                        self.current_token.type = TokenType.IMMEDIATE
-                    self.advance()
-
+                self.parse_identifier()
             elif self.current_token.type == TokenType.DIRECTIVE:
                 self.parse_directive()
             # Syntax errors
