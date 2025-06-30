@@ -117,7 +117,7 @@ class ZX16SecondPassEncoder:
 
         elif instruction == "la":
             reg = line[1].value
-            label = int(line[3].value)
+            label = int(line[3].value) - self.section_pointers[self.current_section]
             line = [
                 Token(TokenType.IDENTIFIER, "auipc", line[0].line, line[0].column),
                 Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
@@ -134,7 +134,10 @@ class ZX16SecondPassEncoder:
                 Token(TokenType.REGISTER, reg, line[1].line, line[1].column),
                 Token(TokenType.COMMA, ",", line[2].line, line[2].column),
                 Token(
-                    TokenType.IMMEDIATE, str(label & 0x7F), line[3].line, line[3].column
+                    TokenType.IMMEDIATE,
+                    str(label & 0x7F),
+                    line[3].line,
+                    line[3],
                 ),
             ]
             self.lines[idx] = line  # replace the original instruction
@@ -419,6 +422,8 @@ class ZX16SecondPassEncoder:
 
                 imm = int(token.value, 0)
                 # label resolution
+                if token.was_label:
+                    imm -= self.section_pointers[self.current_section]
                 if token.was_label and mnemonic in [
                     "jal",
                     "j",
@@ -433,7 +438,6 @@ class ZX16SecondPassEncoder:
                     "bltu",
                     "bgeu",
                 ]:
-                    imm -= self.section_pointers[self.current_section]
                     imm = int(imm / 2)  # integer division by 2 for branch offsets
 
                 # parse
