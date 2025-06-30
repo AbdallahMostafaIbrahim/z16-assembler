@@ -102,8 +102,6 @@ class ZX16SecondPassEncoder:
                     line[0].column,
                 ),
             ]
-            # convert this to binary
-            print(f"Converting {value & 0x7F} to binary: {bin(value & 0x7F)}")
             # build the ORI instruction tokens (low 7 bits & 0x7F)
             second_line = [
                 Token(TokenType.IDENTIFIER, "ori", line[0].line, line[0].column),
