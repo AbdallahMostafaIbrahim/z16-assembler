@@ -416,18 +416,8 @@ class ZX16SecondPassEncoder:
                         token.column,
                     )
                     return
-                # parse
-                try:
-                    imm = binary_to_decimal(
-                        decimal_to_binary(int(token.value, 0), field.width),
-                        signed=field.signed,
-                    )
-                except ValueError:
-                    Zx16Errors.add_error(
-                        f"Invalid immediate '{token.value}'", token.line, token.column
-                    )
-                    return
 
+                imm = int(token.value, 0)
                 # label resolution
                 if token.was_label and mnemonic in [
                     "jal",
@@ -445,6 +435,18 @@ class ZX16SecondPassEncoder:
                 ]:
                     imm -= self.section_pointers[self.current_section]
                     imm = int(imm / 2)  # integer division by 2 for branch offsets
+
+                # parse
+                try:
+                    imm = binary_to_decimal(
+                        decimal_to_binary(imm, field.width),
+                        signed=field.signed,
+                    )
+                except ValueError:
+                    Zx16Errors.add_error(
+                        f"Invalid immediate '{token.value}'", token.line, token.column
+                    )
+                    return
 
                 # range check against the field’s own bounds
                 if not (field.min_value <= imm <= field.max_value):
