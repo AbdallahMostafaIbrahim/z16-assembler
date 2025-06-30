@@ -28,9 +28,6 @@ class ZX16Assembler:
         if Zx16Errors.has_errors():
             return False
 
-        pass2 = ZX16SecondPassEncoder(result, verbose=self.verbose)
-        self.binary_output = pass2.execute()
-
         # If verbose, print the symbol table
         if self.verbose:
             print("Symbol Table:")
@@ -38,6 +35,9 @@ class ZX16Assembler:
                 print(
                     f"{name}: {symbol.value + result.memory_layout.get(symbol.section, 0)} (section: {symbol.section})"
                 )
+
+        pass2 = ZX16SecondPassEncoder(result, verbose=self.verbose)
+        self.binary_output = pass2.execute()
 
         return True
 

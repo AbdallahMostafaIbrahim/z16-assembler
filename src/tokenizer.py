@@ -70,19 +70,22 @@ class Tokenizer:
             if self.current_char().lower() == "x":
                 # Hexadecimal
                 self.advance()
-                while self.current_char().lower() in "0123456789abcdef":
+                while (
+                    self.current_char().lower() in "0123456789abcdef"
+                    and self.pos < len(self.text)
+                ):
                     self.advance()
                 return int(self.text[start_pos : self.pos], 16)
             elif self.current_char().lower() == "b":
                 # Binary
                 self.advance()
-                while self.current_char() in "01":
+                while self.current_char() in "01" and self.pos < len(self.text):
                     self.advance()
                 return int(self.text[start_pos : self.pos], 2)
             elif self.current_char().lower() == "o":
                 # Octal
                 self.advance()
-                while self.current_char() in "01234567":
+                while self.current_char() in "01234567" and self.pos < len(self.text):
                     self.advance()
                 return int(self.text[start_pos : self.pos], 8)
             else:

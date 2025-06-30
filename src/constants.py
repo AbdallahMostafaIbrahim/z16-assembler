@@ -365,7 +365,6 @@ INSTRUCTION_FORMAT: List[PunctuationField | BitFieldSpec] = {
         ImmediateField(6, 15),
     ],
 }
-
 # Pseudo-instructions sizes in bytes
 PSEUDO_INSTRUCTIONS = {
     "li16": 4,

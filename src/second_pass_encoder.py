@@ -12,6 +12,7 @@ from constants import (
 )
 from dataclasses import dataclass
 from first_pass_parser import FirstPassResult
+from utils import binary_to_decimal, decimal_to_binary
 
 
 class ZX16SecondPassEncoder:
@@ -46,6 +47,12 @@ class ZX16SecondPassEncoder:
             self.lines.append(current_line)
 
     def resolve_symbols(self):
+        # Print token values for debugging
+        if self.verbose:
+            print("Resolving symbols in tokens:")
+            for token in self.tokens:
+                print(f"Token: {token.value} (Type: {token.type})")
+
         for token in self.tokens:
             if token.type != TokenType.IDENTIFIER:
                 continue
@@ -56,13 +63,17 @@ class ZX16SecondPassEncoder:
                 or token.value.lower() in PSEUDO_INSTRUCTIONS
             ):
                 continue
-
             # Resolve symbols in the symbol table
             if token.type == TokenType.IDENTIFIER and token.value in self.symbol_table:
                 symbol = self.symbol_table[token.value]
                 token.type = TokenType.IMMEDIATE
-                token.was_label = True
-                token.value = str(symbol.value + self.section_pointers[symbol.section])
+                if symbol.section == "const":
+                    token.value = str(symbol.value)
+                else:
+                    token.was_label = True
+                    token.value = str(
+                        symbol.value + self.section_pointers[symbol.section]
+                    )
             else:
                 # If the symbol is not found, report an error
                 Zx16Errors.add_error(
@@ -91,6 +102,8 @@ class ZX16SecondPassEncoder:
                     line[0].column,
                 ),
             ]
+            # convert this to binary
+            print(f"Converting {value & 0x7F} to binary: {bin(value & 0x7F)}")
             # build the ORI instruction tokens (low 7 bits & 0x7F)
             second_line = [
                 Token(TokenType.IDENTIFIER, "ori", line[0].line, line[0].column),
@@ -407,7 +420,10 @@ class ZX16SecondPassEncoder:
                     return
                 # parse
                 try:
-                    imm = int(token.value, 0)
+                    imm = binary_to_decimal(
+                        decimal_to_binary(int(token.value, 0), field.width),
+                        signed=field.signed,
+                    )
                 except ValueError:
                     Zx16Errors.add_error(
                         f"Invalid immediate '{token.value}'", token.line, token.column
@@ -447,17 +463,6 @@ class ZX16SecondPassEncoder:
                             token.column,
                         )
                     return
-
-                # Wrap into two’s complement
-                width = 0
-                if imm < 0 and field.signed:
-                    if field.allocations:
-                        width = sum(
-                            a.i_end - a.i_beginning + 1 for a in field.allocations
-                        )
-                    else:
-                        width = field.end - field.beginning + 1
-                    imm = (1 << width) + imm
 
                 # encode: split or contiguous
                 if field.allocations:

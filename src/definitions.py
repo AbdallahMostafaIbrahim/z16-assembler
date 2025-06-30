@@ -107,7 +107,7 @@ class ImmediateField(OperandField):
             width = sum(a.i_end - a.i_beginning + 1 for a in allocations)
         else:
             width = end - beginning + 1
-
+        self.width = width
         # Determine bounds
         if min_value is not None and max_value is not None:
             self.min_value, self.max_value = min_value, max_value
