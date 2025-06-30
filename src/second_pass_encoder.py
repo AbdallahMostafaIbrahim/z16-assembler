@@ -51,7 +51,10 @@ class ZX16SecondPassEncoder:
                 continue
 
             # Skip any instructions
-            if token.value in INSTRUCTION_FORMAT or token.value in PSEUDO_INSTRUCTIONS:
+            if (
+                token.value.lower() in INSTRUCTION_FORMAT
+                or token.value.lower() in PSEUDO_INSTRUCTIONS
+            ):
                 continue
 
             # Resolve symbols in the symbol table
