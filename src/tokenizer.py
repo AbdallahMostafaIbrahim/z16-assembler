@@ -37,7 +37,7 @@ class Tokenizer:
 
     def skip_whitespace(self) -> None:
         """Skip whitespace except newlines."""
-        while self.current_char() in " \t\r":
+        while self.current_char() in " \t\r" and self.pos < len(self.text):
             self.advance()
 
     def read_string(self) -> str:
@@ -143,7 +143,7 @@ class Tokenizer:
                 start_pos = self.pos
                 while self.current_char() and self.current_char() != "\n":
                     self.advance()
-                # For simplicity, we ignore comments entirely 
+                # For simplicity, we ignore comments entirely
                 continue
 
             # Handle block comments

@@ -77,7 +77,6 @@ class ZX16SecondPassEncoder:
         if instruction == "li16":
             reg = line[1].value
             value = int(line[3].value)
-            print(f"TS my ass {(value >> 7)}")
             line = [
                 Token(TokenType.IDENTIFIER, "lui", line[0].line, line[0].column),
                 Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
@@ -334,9 +333,6 @@ class ZX16SecondPassEncoder:
         for field in specs:
             if isinstance(field, ConstantField):
                 word |= int(field.const_value, 2) << field.beginning
-
-        if line[0].value == "lui":
-            print("TS MY LINE", line)
 
         # 2) Consume tokens for punctuation, registers, immediates
         token_idx = 1
