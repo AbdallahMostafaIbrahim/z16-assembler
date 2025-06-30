@@ -173,7 +173,11 @@ class ZX16SecondPassEncoder:
                 Token(TokenType.REGISTER, "x1", line[0].line, line[0].column),
                 Token(TokenType.COMMA, ",", line[0].line, line[0].column),
                 Token(
-                    TokenType.IMMEDIATE, offset, line[0].line, line[0].column
+                    TokenType.IMMEDIATE,
+                    offset,
+                    line[0].line,
+                    line[0].column,
+                    was_label=True,
                 ),  # Placeholder
             ]
             self.lines[idx] = line
