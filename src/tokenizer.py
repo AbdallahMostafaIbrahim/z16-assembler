@@ -99,7 +99,11 @@ class Tokenizer:
         """Read an identifier."""
         start_pos = self.pos
 
-        while self.current_char().isalnum() or self.current_char() in "_":
+        while (
+            self.current_char().isalnum()
+            or self.current_char() in "_"
+            and self.pos < len(self.text)
+        ):
             self.advance()
 
         return self.text[start_pos : self.pos]
