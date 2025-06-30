@@ -9,8 +9,10 @@ from typing import List, Optional
 
 SectionType = Literal[".text", ".data", ".bss", "const"]
 
+
 class TokenType(Enum):
     """Token types for lexical analysis."""
+
     IDENTIFIER = auto()
     REGISTER = auto()
     IMMEDIATE = auto()
@@ -24,8 +26,11 @@ class TokenType(Enum):
     RPAREN = auto()
     OPERATOR = auto()
     EOF = auto()
+
+
 class Opcode(Enum):
     """ZX16 opcode."""
+
     R_TYPE = 0b000
     I_TYPE = 0b001
     B_TYPE = 0b010
@@ -35,6 +40,7 @@ class Opcode(Enum):
     U_TYPE = 0b110
     SYS_TYPE = 0b111
 
+
 @dataclass
 class MemoryAllocation:
     # Memory allocation
@@ -43,6 +49,7 @@ class MemoryAllocation:
     # Immediate Allocation
     i_beginning: int = None
     i_end: int = None
+
 
 @dataclass
 class BitFieldSpec:
@@ -131,6 +138,7 @@ class PunctuationField:
 @dataclass
 class Token:
     """Represents a lexical token."""
+
     type: TokenType
     value: str
     line: int
@@ -150,7 +158,6 @@ class Symbol:
     line: int = 0
 
 
-
 @dataclass
 class FirstPassResult:
     """Contains the results of the first pass parsing."""
@@ -158,8 +165,11 @@ class FirstPassResult:
     tokens: List[Token]
     symbol_table: Dict[str, Symbol]
     memory_layout: Dict[str, int]
+
+
 class OutputFormat(Enum):
     """Supported output formats."""
+
     BINARY = "bin"
     INTEL_HEX = "hex"
     VERILOG = "verilog"

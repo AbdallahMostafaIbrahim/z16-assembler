@@ -1,4 +1,3 @@
-
 from typing import List
 from definitions import (
     TokenType,
@@ -9,7 +8,6 @@ from definitions import (
     ImmediateField,
     PunctuationField,
 )
-
 
 
 INSTRUCTION_FORMAT: List[PunctuationField | BitFieldSpec] = {
@@ -311,13 +309,13 @@ INSTRUCTION_FORMAT: List[PunctuationField | BitFieldSpec] = {
         OperandField(9, 11, TokenType.REGISTER),
         PunctuationField(TokenType.RPAREN),
     ],
-    # J-Type Instructions (opcode 101)
+    # TODO
     "j": [
         ConstantField(0, 2, "101"),
         ImmediateField(
             allocations=[
-                MemoryAllocation(m_beginning=3, m_end=5, i_beginning=1, i_end=3),
-                MemoryAllocation(m_beginning=9, m_end=14, i_beginning=4, i_end=9),
+                MemoryAllocation(m_beginning=3, m_end=5, i_beginning=0, i_end=2),
+                MemoryAllocation(m_beginning=9, m_end=14, i_beginning=3, i_end=8),
             ],
         ),
         ConstantField(15, 15, "0"),
@@ -341,8 +339,8 @@ INSTRUCTION_FORMAT: List[PunctuationField | BitFieldSpec] = {
         PunctuationField(TokenType.COMMA),
         ImmediateField(
             allocations=[
-                MemoryAllocation(m_beginning=3, m_end=5, i_beginning=7, i_end=9),
-                MemoryAllocation(m_beginning=9, m_end=14, i_beginning=10, i_end=15),
+                MemoryAllocation(m_beginning=3, m_end=5, i_beginning=0, i_end=2),
+                MemoryAllocation(m_beginning=9, m_end=14, i_beginning=3, i_end=8),
             ],
             signed=False,
         ),
@@ -354,8 +352,8 @@ INSTRUCTION_FORMAT: List[PunctuationField | BitFieldSpec] = {
         PunctuationField(TokenType.COMMA),
         ImmediateField(
             allocations=[
-                MemoryAllocation(m_beginning=3, m_end=5, i_beginning=7, i_end=9),
-                MemoryAllocation(m_beginning=9, m_end=14, i_beginning=10, i_end=15),
+                MemoryAllocation(m_beginning=3, m_end=5, i_beginning=0, i_end=2),
+                MemoryAllocation(m_beginning=9, m_end=14, i_beginning=3, i_end=8),
             ],
             signed=False,
         ),
@@ -393,4 +391,3 @@ DEFAULT_SYMBOLS = {
     "STACK_TOP": 0xEFFE,  # Default stack top
     "MEM_SIZE": 0x10000,  # Total memory size (64KB)
 }
-

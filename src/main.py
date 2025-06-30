@@ -7,6 +7,7 @@ from pathlib import Path
 from first_pass_parser import ZX16FirstPassParser
 from second_pass_encoder import ZX16SecondPassEncoder
 
+
 class ZX16Assembler:
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
@@ -21,13 +22,13 @@ class ZX16Assembler:
         if Zx16Errors.has_errors():
             return False
 
-        pass1 = ZX16FirstPassParser(tokens)
+        pass1 = ZX16FirstPassParser(tokens, verbose=self.verbose)
         result = pass1.execute()
 
         if Zx16Errors.has_errors():
             return False
 
-        pass2 = ZX16SecondPassEncoder(result)
+        pass2 = ZX16SecondPassEncoder(result, verbose=self.verbose)
         self.binary_output = pass2.execute()
 
         # If verbose, print the symbol table
@@ -39,21 +40,27 @@ class ZX16Assembler:
                 )
 
         return True
-   
+
     def get_binary_output(self) -> bytes:
         """Get binary output."""
         return bytes(self.binary_output)
+
     def get_intel_hex_output(self) -> str:
         pass
+
     def get_verilog_output(self, module_name: str = "program_memory") -> str:
         pass
+
     def get_memory_file_output(self, sparse: bool = False) -> str:
         pass
+
     def get_listing_output(self, source_lines: List[str]) -> str:
         pass
+
     def print_errors(self) -> List[str]:
         """Get a list of errors."""
-        return Zx16Errors.has_errors()
+        return Zx16Errors.print_errors()
+
 
 def main():
     """Main entry point for the assembler."""
@@ -95,7 +102,6 @@ def main():
     # Assemble
     success = assembler.assemble(source_code)
     assembler.print_errors()
-    
 
     if not success:
         return 1

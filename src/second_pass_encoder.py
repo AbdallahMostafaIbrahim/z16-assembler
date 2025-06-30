@@ -17,7 +17,7 @@ from first_pass_parser import FirstPassResult
 class ZX16SecondPassEncoder:
     """Second Pass Encoder for ZX16 assembly language."""
 
-    def __init__(self, data: FirstPassResult,verbose: bool = False):
+    def __init__(self, data: FirstPassResult, verbose: bool = False):
         self.verbose = verbose
         self.tokens = data.tokens
         self.symbol_table = data.symbol_table
@@ -68,37 +68,181 @@ class ZX16SecondPassEncoder:
                 token.type = TokenType.IMMEDIATE
                 token.value = "0"
 
-    def resolve_pseudo_instructions(self, Line: List[Token] = None) -> None:
+    def resolve_pseudo_instructions(self, line: List[Token], idx: int) -> List[Token]:
         """Expand psuedo instruction like
         i16, la, push, pop, call, ret, inc, dec, neg, not, clr, nop
         to true instructions"""
-        instruction = Line[0].value.lower()
-        if instruction == "i16":
-            pass
-        elif instruction == "la":
-            pass
-        elif instruction == "push":
-            pass
-        elif instruction == "pop":
-            pass
-        elif instruction == "call":
-            pass
-        elif instruction == "ret":
-            pass
-        elif instruction == "inc":
-            pass
-        elif instruction == "dec":
-            pass
-        elif instruction == "neg":
-            pass
-        elif instruction == "not":
-            pass
-        elif instruction == "clr":
-            pass
-        elif instruction == "nop":
-            pass
+        instruction = line[0].value.lower()
 
-       
+        if instruction == "li16":
+            reg = line[1].value
+            value = int(line[3].value)
+            print(f"TS my ass {(value >> 7)}")
+            line = [
+                Token(TokenType.IDENTIFIER, "lui", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
+                Token(TokenType.COMMA, ",", line[0].line, line[0].column),
+                Token(
+                    TokenType.IMMEDIATE,
+                    str(value >> 7),
+                    line[0].line,
+                    line[0].column,
+                ),
+            ]
+            # build the ORI instruction tokens (low 7 bits & 0x7F)
+            second_line = [
+                Token(TokenType.IDENTIFIER, "ori", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, reg, line[1].line, line[1].column),
+                Token(TokenType.COMMA, ",", line[2].line, line[2].column),
+                Token(
+                    TokenType.IMMEDIATE, str(value & 0x7F), line[3].line, line[3].column
+                ),
+            ]
+            self.lines[idx] = line  # replace the original instruction
+            # insert the ORI right after, shifting the rest down
+            self.lines.insert(idx + 1, second_line)
+
+        elif instruction == "la":
+            reg = line[1].value
+            label = int(line[3].value)
+            line = [
+                Token(TokenType.IDENTIFIER, "auipc", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
+                Token(TokenType.COMMA, ",", line[0].line, line[0].column),
+                Token(
+                    TokenType.IMMEDIATE,
+                    str(label >> 7),
+                    line[0].line,
+                    line[0].column,
+                ),
+            ]
+            second_line = [
+                Token(TokenType.IDENTIFIER, "addi", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, reg, line[1].line, line[1].column),
+                Token(TokenType.COMMA, ",", line[2].line, line[2].column),
+                Token(
+                    TokenType.IMMEDIATE, str(label & 0x7F), line[3].line, line[3].column
+                ),
+            ]
+            self.lines[idx] = line  # replace the original instruction
+            self.lines.insert(idx + 1, second_line)  # insert the ADDI right
+        elif instruction == "push":
+            reg = line[1].value
+            line = [
+                Token(TokenType.IDENTIFIER, "addi", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, "x2", line[0].line, line[0].column),
+                Token(TokenType.COMMA, ",", line[0].line, line[0].column),
+                Token(TokenType.IMMEDIATE, "-2", line[0].line, line[0].column),
+            ]
+            second_line = [
+                Token(TokenType.IDENTIFIER, "sw", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
+                Token(TokenType.COMMA, ",", line[0].line, line[0].column),
+                Token(TokenType.IMMEDIATE, "0", line[0].line, line[0].column),
+                Token(TokenType.LPAREN, "(", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, "x2", line[0].line, line[0].column),
+                Token(TokenType.RPAREN, ")", line[0].line, line[0].column),
+            ]
+            self.lines[idx] = line  # replace the original instruction
+            self.lines.insert(idx + 1, second_line)  # insert the ADDI right
+        elif instruction == "pop":
+            reg = line[1].value
+            line = [
+                Token(TokenType.IDENTIFIER, "lw", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
+                Token(TokenType.COMMA, ",", line[0].line, line[0].column),
+                Token(TokenType.IMMEDIATE, "0", line[0].line, line[0].column),
+                Token(TokenType.LPAREN, "(", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, "x2", line[0].line, line[0].column),
+                Token(TokenType.RPAREN, ")", line[0].line, line[0].column),
+            ]
+            second_line = [
+                Token(TokenType.IDENTIFIER, "addi", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, "x2", line[0].line, line[0].column),
+                Token(TokenType.COMMA, ",", line[0].line, line[0].column),
+                Token(TokenType.IMMEDIATE, "2", line[0].line, line[0].column),
+            ]
+            self.lines[idx] = line  # replace the original instruction
+            self.lines.insert(idx + 1, second_line)  # insert the ADDI right
+        elif instruction == "call":
+            offset = line[1].value
+            line = [
+                Token(TokenType.IDENTIFIER, "jal", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, "x1", line[0].line, line[0].column),
+                Token(TokenType.COMMA, ",", line[0].line, line[0].column),
+                Token(
+                    TokenType.IMMEDIATE, offset, line[0].line, line[0].column
+                ),  # Placeholder
+            ]
+            self.lines[idx] = line
+        elif instruction == "ret":
+            line = [
+                Token(TokenType.IDENTIFIER, "jr", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, "x1", line[0].line, line[0].column),
+            ]
+            self.lines[idx] = line  # replace the original instruction
+        elif instruction == "inc":
+            reg = line[1].value
+            line = [
+                Token(TokenType.IDENTIFIER, "addi", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
+                Token(TokenType.COMMA, ",", line[0].line, line[0].column),
+                Token(TokenType.IMMEDIATE, "1", line[0].line, line[0].column),
+            ]
+            self.lines[idx] = line  # replace the original instruction
+        elif instruction == "dec":
+            reg = line[1].value
+            line = [
+                Token(TokenType.IDENTIFIER, "addi", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
+                Token(TokenType.COMMA, ",", line[0].line, line[0].column),
+                Token(TokenType.IMMEDIATE, "-1", line[0].line, line[0].column),
+            ]
+            self.lines[idx] = line  # replace the original instruction
+        elif instruction == "neg":
+            reg = line[1].value
+            line = [
+                Token(TokenType.IDENTIFIER, "xori", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
+                Token(TokenType.COMMA, ",", line[0].line, line[0].column),
+                Token(TokenType.IMMEDIATE, "-1", line[0].line, line[0].column),
+            ]
+            second_line = [
+                Token(TokenType.IDENTIFIER, "addi", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
+                Token(TokenType.COMMA, ",", line[0].line, line[0].column),
+                Token(TokenType.IMMEDIATE, "1", line[0].line, line[0].column),
+            ]
+            self.lines[idx] = line  # replace the original instruction
+            self.lines.insert(idx + 1, second_line)  # insert the ADDI right
+        elif instruction == "not":
+            reg = line[1].value
+            line = [
+                Token(TokenType.IDENTIFIER, "xori", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
+                Token(TokenType.COMMA, ",", line[0].line, line[0].column),
+                Token(TokenType.IMMEDIATE, "-1", line[0].line, line[0].column),
+            ]
+            self.lines[idx] = line  # replace the original instruction
+        elif instruction == "clr":
+            reg = line[1].value
+            line = [
+                Token(TokenType.IDENTIFIER, "xor", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
+                Token(TokenType.COMMA, ",", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
+            ]
+            self.lines[idx] = line  # replace the original instruction
+        elif instruction == "nop":
+            line = [
+                Token(TokenType.IDENTIFIER, "add", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, "x0", line[0].line, line[0].column),
+                Token(TokenType.COMMA, ",", line[0].line, line[0].column),
+                Token(TokenType.REGISTER, "x0", line[0].line, line[0].column),
+            ]
+            self.lines[idx] = line  # replace the original instruction
+
+        return self.lines[idx]
 
     def write_memory(self, value: int, size: int) -> None:
         """Write a value to the memory at the specified address."""
@@ -127,7 +271,9 @@ class ZX16SecondPassEncoder:
             value = int(line[1].value, 0)
             if value < 0 or value >= len(self.memory):
                 Zx16Errors.add_error(
-                    f"ORG value {value} out of bounds (0-65535)", line[1].line, line[1].column
+                    f"ORG value {value} out of bounds (0-65535)",
+                    line[1].line,
+                    line[1].column,
                 )
                 return
             if value < DEFAULT_SYMBOLS["CODE_START"]:
@@ -172,7 +318,6 @@ class ZX16SecondPassEncoder:
                     for _ in range(fill_size):
                         self.write_memory(fill_value, fill_size)
 
-   
     def encode_instruction(self, line: List[Token]) -> None:
         """Encode an instruction line, reporting errors via Zx16Errors."""
         mnemonic = line[0].value.lower()
@@ -189,6 +334,9 @@ class ZX16SecondPassEncoder:
         for field in specs:
             if isinstance(field, ConstantField):
                 word |= int(field.const_value, 2) << field.beginning
+
+        if line[0].value == "lui":
+            print("TS MY LINE", line)
 
         # 2) Consume tokens for punctuation, registers, immediates
         token_idx = 1
@@ -264,8 +412,22 @@ class ZX16SecondPassEncoder:
                     return
 
                 # label resolution
-                if token.was_label:
+                if token.was_label and mnemonic in [
+                    "jal",
+                    "j",
+                    "jr",
+                    "jalr",
+                    "beq",
+                    "bne",
+                    "bz",
+                    "bnz",
+                    "blt",
+                    "bge",
+                    "bltu",
+                    "bgeu",
+                ]:
                     imm -= self.section_pointers[self.current_section]
+                    imm //= 2  # integer division by 2 for branch offsets
 
                 # range check against the field’s own bounds
                 if not (field.min_value <= imm <= field.max_value):
@@ -317,9 +479,8 @@ class ZX16SecondPassEncoder:
         self.resolve_symbols()
         self.lionize()
         # TODO : Resolve symbols in the lines
-        self.resolve_pseudo_instructions()
 
-        for line in self.lines:
+        for idx, line in enumerate(self.lines):
             if self.verbose:
                 print(f"Processing line: {[token.value for token in line]}")
             # Look at the first token to determine the type of line
@@ -329,14 +490,7 @@ class ZX16SecondPassEncoder:
                 self.encode_directive(line)
             elif line[0].type == TokenType.IDENTIFIER:  # Instruction line
                 if line[0].value.lower() in PSEUDO_INSTRUCTIONS:
-                    self.resolve_pseudo_instructions(line)
+                    line = self.resolve_pseudo_instructions(line, idx)
                 self.encode_instruction(line)
-            else:
-                Zx16Errors.add_error(
-                    f"Unexpected token type {line[0].type} in line: {line}",
-                    line[0].line,
-                    line[0].column,
-                )
-                break
+
         return self.memory
-       

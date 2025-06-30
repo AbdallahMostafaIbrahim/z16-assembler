@@ -1,7 +1,7 @@
 from typing import List
 from tokenizer import TokenType, Token
 from typing import Dict, List, Literal
-from definitions import Symbol, SectionType , FirstPassResult
+from definitions import Symbol, SectionType, FirstPassResult
 from error_handler import Zx16Errors
 from constants import DEFAULT_SYMBOLS, PSEUDO_INSTRUCTIONS, INSTRUCTION_FORMAT
 
@@ -9,7 +9,7 @@ from constants import DEFAULT_SYMBOLS, PSEUDO_INSTRUCTIONS, INSTRUCTION_FORMAT
 class ZX16FirstPassParser:
     """Parser for ZX16 assembly language."""
 
-    def __init__(self, tokens: List[Token],verbose: bool = False):
+    def __init__(self, tokens: List[Token], verbose: bool = False):
         self.verbose = verbose
         self.tokens = tokens
         self.symbol_table: Dict[str, Symbol] = {}
@@ -313,22 +313,22 @@ class ZX16FirstPassParser:
                 f"Unknown directive '{directive}'", self.current_token.line
             )
             self.advance()
-    
+
     def parse_identifier(self):
-                potential = self.current_token.value.lower()
-                if potential in INSTRUCTION_FORMAT:
-                    self.pointer_advance(2)
-                elif potential in PSEUDO_INSTRUCTIONS:
-                    self.pointer_advance(PSEUDO_INSTRUCTIONS[potential])
-                # Keep advancing until we find a new line
-                while self.current_token.type not in [TokenType.NEWLINE, TokenType.EOF]:
-                    if self.current_token.type == TokenType.CHARACTER:
-                        self.current_token.type = TokenType.IMMEDIATE
-                    self.advance()
-    
+        potential = self.current_token.value.lower()
+        if potential in INSTRUCTION_FORMAT:
+            self.pointer_advance(2)
+        elif potential in PSEUDO_INSTRUCTIONS:
+            self.pointer_advance(PSEUDO_INSTRUCTIONS[potential])
+        # Keep advancing until we find a new line
+        while self.current_token.type not in [TokenType.NEWLINE, TokenType.EOF]:
+            if self.current_token.type == TokenType.CHARACTER:
+                self.current_token.type = TokenType.IMMEDIATE
+            self.advance()
+
     def calculate_memory_layout(self):
         self.memory_layout[".data"] = (
-            self.memory_layout[".text"] + self.section_pointers[".text"] 
+            self.memory_layout[".text"] + self.section_pointers[".text"]
         )
         self.memory_layout[".bss"] = (
             self.memory_layout[".data"] + self.section_pointers[".data"]
