@@ -423,7 +423,7 @@ class ZX16SecondPassEncoder:
                     "bgeu",
                 ]:
                     imm -= self.section_pointers[self.current_section]
-                    imm //= 2  # integer division by 2 for branch offsets
+                    imm = int(imm / 2)  # integer division by 2 for branch offsets
 
                 # range check against the field’s own bounds
                 if not (field.min_value <= imm <= field.max_value):
@@ -440,6 +440,17 @@ class ZX16SecondPassEncoder:
                             token.column,
                         )
                     return
+
+                # Wrap into two’s complement
+                width = 0
+                if imm < 0 and field.signed:
+                    if field.allocations:
+                        width = sum(
+                            a.i_end - a.i_beginning + 1 for a in field.allocations
+                        )
+                    else:
+                        width = field.end - field.beginning + 1
+                    imm = (1 << width) + imm
 
                 # encode: split or contiguous
                 if field.allocations:

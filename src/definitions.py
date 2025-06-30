@@ -100,6 +100,7 @@ class ImmediateField(OperandField):
         )
 
         self.allocations = allocations or []
+        self.signed = signed
 
         # Compute width
         if allocations:
