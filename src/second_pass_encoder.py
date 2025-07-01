@@ -91,40 +91,49 @@ class ZX16SecondPassEncoder:
         if instruction == "li16":
             reg = line[1].value
             value = int(line[3].value)
+            auipc_imm = value >> 7
+            addi_imm = value & 0x7F
+            # Check if the addi_imm is signed
+            if addi_imm & 0x40:
+                auipc_imm += 1
             line = [
                 Token(TokenType.IDENTIFIER, "lui", line[0].line, line[0].column),
                 Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
                 Token(TokenType.COMMA, ",", line[0].line, line[0].column),
                 Token(
                     TokenType.IMMEDIATE,
-                    str(value >> 7),
+                    str(auipc_imm),
                     line[0].line,
                     line[0].column,
                 ),
             ]
-            # build the ORI instruction tokens (low 7 bits & 0x7F)
+            # build the ADDI instruction tokens (low 7 bits & 0x7F)
             second_line = [
-                Token(TokenType.IDENTIFIER, "ori", line[0].line, line[0].column),
+                Token(TokenType.IDENTIFIER, "addi", line[0].line, line[0].column),
                 Token(TokenType.REGISTER, reg, line[1].line, line[1].column),
                 Token(TokenType.COMMA, ",", line[2].line, line[2].column),
-                Token(
-                    TokenType.IMMEDIATE, str(value & 0x7F), line[3].line, line[3].column
-                ),
+                Token(TokenType.IMMEDIATE, str(addi_imm), line[3].line, line[3].column),
             ]
             self.lines[idx] = line  # replace the original instruction
-            # insert the ORI right after, shifting the rest down
+            # insert the ADDI right after, shifting the rest down
             self.lines.insert(idx + 1, second_line)
 
         elif instruction == "la":
             reg = line[1].value
             label = int(line[3].value) - self.section_pointers[self.current_section]
+
+            auipc_imm = label >> 7
+            addi_imm = label & 0x7F
+            # Check if the addi_imm is signed
+            if addi_imm & 0x40:
+                auipc_imm += 1
             line = [
                 Token(TokenType.IDENTIFIER, "auipc", line[0].line, line[0].column),
                 Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
                 Token(TokenType.COMMA, ",", line[0].line, line[0].column),
                 Token(
                     TokenType.IMMEDIATE,
-                    str(label >> 7),
+                    str(auipc_imm),
                     line[0].line,
                     line[0].column,
                 ),
@@ -135,9 +144,9 @@ class ZX16SecondPassEncoder:
                 Token(TokenType.COMMA, ",", line[2].line, line[2].column),
                 Token(
                     TokenType.IMMEDIATE,
-                    str(label & 0x7F),
+                    str(addi_imm),
                     line[3].line,
-                    line[3],
+                    line[3].column,
                 ),
             ]
             self.lines[idx] = line  # replace the original instruction
@@ -311,15 +320,15 @@ class ZX16SecondPassEncoder:
         elif directive in [".byte", ".word", ".string", ".ascii", ".space", ".fill"]:
             if directive in [".byte"]:
                 for operand in line[1:]:
-                    if operand.type == TokenType.COMMA:
+                    if operand.type == TokenType.COMMA or operand.type == TokenType.EOF:
                         continue
                     value = int(operand.value, 0)
                     self.write_memory(value, 1)
             elif directive in [".word"]:
                 for operand in line[1:]:
-                    if operand.type == TokenType.COMMA:
+                    if operand.type == TokenType.COMMA or operand.type == TokenType.EOF:
                         continue
-                    value = int(self.current_token.value, 0)
+                    value = int(operand.value, 0)
                     self.write_memory(value, 2)
             elif directive in [".string", ".ascii"]:
                 value = line[1].value
