@@ -322,7 +322,7 @@ INSTRUCTION_FORMAT: List[PunctuationField | BitFieldSpec] = {
     ],
     "jal": [
         ConstantField(0, 2, "101"),
-        OperandField(3, 5, TokenType.REGISTER),
+        OperandField(6, 8, TokenType.REGISTER),
         PunctuationField(TokenType.COMMA),
         ImmediateField(
             allocations=[
