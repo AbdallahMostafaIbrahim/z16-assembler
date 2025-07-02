@@ -22,6 +22,7 @@ def decimal_to_binary(num: int, width: int) -> str:
     Convert an integer `num` into its two’s-complement binary representation
     using exactly `width` bits.
     """
+
     # Validate inputs
     if not isinstance(num, int):
         raise ValueError("For signed mode, pass an integer.")

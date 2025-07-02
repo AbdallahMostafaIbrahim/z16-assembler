@@ -86,6 +86,9 @@ class ZX16SecondPassEncoder:
         """Expand psuedo instruction like
         i16, la, push, pop, call, ret, inc, dec, neg, not, clr, nop
         to true instructions"""
+
+        # TODO: Do validation of pseudo instructions
+
         instruction = line[0].value.lower()
 
         if instruction == "li16":
@@ -120,6 +123,15 @@ class ZX16SecondPassEncoder:
 
         elif instruction == "la":
             reg = line[1].value
+
+            # TODO: la should only accept labels?
+            if line[3].was_label == False:
+                Zx16Errors.add_error(
+                    f"LA instruction expects a label, got {line[3].value}",
+                    line[3].line,
+                    line[3].column,
+                )
+                return line
             label = int(line[3].value) - self.section_pointers[self.current_section]
 
             auipc_imm = label >> 7
@@ -355,7 +367,6 @@ class ZX16SecondPassEncoder:
                 f"Unknown instruction '{mnemonic}'", line[0].line, line[0].column
             )
             return
-
         specs = INSTRUCTION_FORMAT[mnemonic]
         word = 0
 
@@ -451,6 +462,7 @@ class ZX16SecondPassEncoder:
 
                 # parse
                 try:
+                    # TODO: look at li 128 for, which the immediate is 128, but the field width is 7 bits, but somehow it works
                     imm = binary_to_decimal(
                         decimal_to_binary(imm, field.width),
                         signed=field.signed,
@@ -460,7 +472,6 @@ class ZX16SecondPassEncoder:
                         f"Invalid immediate '{token.value}'", token.line, token.column
                     )
                     return
-
                 # range check against the field’s own bounds
                 if not (field.min_value <= imm <= field.max_value):
                     if token.was_label:
@@ -504,7 +515,7 @@ class ZX16SecondPassEncoder:
         self.write_memory(word, 2)
         if self.verbose:
             print(
-                f"Encoded {mnemonic}: 0x{word:04x} @ {self.current_section}:{self.section_pointers[self.current_section]}"
+                f"Encoded {mnemonic}: 0x{word:04x} 0b{word:016b} @ {self.current_section}:{self.section_pointers[self.current_section]}"
             )
 
     def execute(self) -> bytearray:
