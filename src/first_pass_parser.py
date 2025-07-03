@@ -138,12 +138,12 @@ class ZX16FirstPassParser:
             self.current_section = directive
             self.advance()
         elif directive == ".org":  # ORG :(
-            if self.current_section not in [".text", ".inter"]:
-                Zx16Errors.add_error(
-                    f".org directive can only be used in the .text section, not in {self.current_section}. It works like .space in the .text section",
-                    line,
-                )
-                return
+            # if self.current_section not in [".text", ".inter"]:
+            #     Zx16Errors.add_error(
+            #         f".org directive can only be used in the .text section, not in {self.current_section}. It works like .space in the .text section",
+            #         line,
+            #     )
+            #     return
 
             if self.peek().type != TokenType.IMMEDIATE:
                 Zx16Errors.add_error(
@@ -158,12 +158,12 @@ class ZX16FirstPassParser:
                     line,
                 )
                 return
-            if value < 0 or value >= DEFAULT_SYMBOLS["STACK_TOP"]:
-                Zx16Errors.add_error(
-                    f"Value {value:#04x} out of range for .org directive (RAM, ROM, interrupt)",
-                    line,
-                )
-                return
+            # if value < 0 or value >= DEFAULT_SYMBOLS["STACK_TOP"]:
+            #     Zx16Errors.add_error(
+            #         f"Value {value:#04x} out of range for .org directive (RAM, ROM, interrupt)",
+            #         line,
+            #     )
+            #     return
 
             if value < DEFAULT_SYMBOLS["CODE_START"]:
                 self.current_section = ".inter"
@@ -175,12 +175,12 @@ class ZX16FirstPassParser:
             self.advance()
         # Data Directives
         elif directive in [".byte", ".word", ".string", ".ascii", ".space", ".fill"]:
-            if self.current_section not in [".data", ".bss"]:
-                Zx16Errors.add_error(
-                    f"{directive} directive can only be used in the .data or .bss sections, not in {self.current_section}",
-                    line,
-                )
-                return
+            # if self.current_section not in [".data", ".bss"]:
+            #     Zx16Errors.add_error(
+            #         f"{directive} directive can only be used in the .data or .bss sections, not in {self.current_section}",
+            #         line,
+            #     )
+            #     return
             if directive in [".byte"]:
                 if self.peek().type not in [TokenType.IMMEDIATE, TokenType.CHARACTER]:
                     Zx16Errors.add_error(

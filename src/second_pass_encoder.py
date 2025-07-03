@@ -30,7 +30,7 @@ class ZX16SecondPassEncoder:
             ".text": data.memory_layout[".text"],
             ".data": data.memory_layout[".data"],
             ".bss": data.memory_layout[".bss"],
-            "MMIO": data.memory_layout["MMIO_BASE"],
+            "MMIO": DEFAULT_SYMBOLS["MMIO_BASE"],
         }
         self.memory = bytearray(65536)  # Data to be assembled (64KB)
 
