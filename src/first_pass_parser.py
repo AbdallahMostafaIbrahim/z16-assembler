@@ -168,9 +168,12 @@ class ZX16FirstPassParser:
             if value < DEFAULT_SYMBOLS["CODE_START"]:
                 self.current_section = ".inter"
                 self.section_pointers[".inter"] = value
-            else:
+            elif value < DEFAULT_SYMBOLS["MMIO_BASE"]:
                 self.current_section = ".text"
                 self.section_pointers[".text"] = value - DEFAULT_SYMBOLS["CODE_START"]
+            else:
+                pass
+
 
             self.advance()
         # Data Directives
@@ -327,6 +330,8 @@ class ZX16FirstPassParser:
             self.advance()
 
     def calculate_memory_layout(self):
+
+
         self.memory_layout[".data"] = (
             self.memory_layout[".text"] + self.section_pointers[".text"]
         )
@@ -347,7 +352,6 @@ class ZX16FirstPassParser:
         self.reset()
 
         # TODO: Handle ifs, in another Loop
-
         while self.current_token.type != TokenType.EOF:
             if self.current_token.type == TokenType.LABEL:
                 self.parse_label()
@@ -355,6 +359,7 @@ class ZX16FirstPassParser:
                 self.parse_identifier()
             elif self.current_token.type == TokenType.DIRECTIVE:
                 self.parse_directive()
+
             # Syntax errors
             if self.current_token.type not in [TokenType.NEWLINE, TokenType.EOF]:
                 Zx16Errors.add_error(

@@ -510,7 +510,7 @@ class ZX16SecondPassEncoder:
         self.write_memory(word, 2)
         if self.verbose:
             print(
-                f"Encoded {mnemonic}: 0x{word:04x} 0b{word:016b} @ {self.current_section}:{self.section_pointers[self.current_section]}"
+                f"Encoded {mnemonic}: 0x{word:04X} 0b{word:016b} @ {self.current_section}:{self.section_pointers[self.current_section]} or address {self.section_pointers[self.current_section]:04X}"
             )
 
     def execute(self) -> bytearray:
