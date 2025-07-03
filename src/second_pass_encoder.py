@@ -289,8 +289,6 @@ class ZX16SecondPassEncoder:
     def write_memory(self, value: int, size: int) -> None:
         """Write a value to the memory at the specified address."""
         address = self.section_pointers[self.current_section]
-        print(f"Writing value {value} of size {size} at address {address:04X}, section {self.current_section}")
-        print(f"{self.section_pointers['MMIO']:04X}")
 
 
 
@@ -314,7 +312,6 @@ class ZX16SecondPassEncoder:
         if directive in [".text", ".data", ".bss"]:  # Sections
             self.current_section = directive
         elif directive == ".org":
-            print (f"ORG directive: {int(line[1].value, 0):04X}")
             value = int(line[1].value, 0)
             if value < 0 or value >= len(self.memory):
                 Zx16Errors.add_error(

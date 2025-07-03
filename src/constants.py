@@ -237,7 +237,7 @@ INSTRUCTION_FORMAT: List[PunctuationField | BitFieldSpec] = {
         PunctuationField(TokenType.COMMA),
         OperandField(9, 11, TokenType.REGISTER),
         PunctuationField(TokenType.COMMA),
-        OperandField(12, 15, TokenType.IMMEDIATE),
+        ImmediateField(12, 15),
     ],
     "bltu": [
         ConstantField(0, 2, "010"),
