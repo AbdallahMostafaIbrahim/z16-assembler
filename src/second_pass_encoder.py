@@ -23,7 +23,7 @@ class ZX16SecondPassEncoder:
         self.tokens = data.tokens
         self.symbol_table = data.symbol_table
         self.lines: List[List[Token]] = []  # List of lines with tokens
-        self.current_section: Literal[".inter", ".text", ".data", ".bss"] = ".text"
+        self.current_section: Literal[".inter", ".text", ".data", ".bss","MMIO"] = ".text"
         self.section_pointers: Dict[str, int] = {
             # Those are all relative to the start of each section
             ".inter": data.memory_layout[".inter"],
@@ -289,6 +289,10 @@ class ZX16SecondPassEncoder:
     def write_memory(self, value: int, size: int) -> None:
         """Write a value to the memory at the specified address."""
         address = self.section_pointers[self.current_section]
+        print(f"Writing value {value} of size {size} at address {address:04X}, section {self.current_section}")
+        print(f"{self.section_pointers['MMIO']:04X}")
+
+
 
         # Little endian encoding
         if 0 <= address < len(self.memory):
@@ -310,6 +314,7 @@ class ZX16SecondPassEncoder:
         if directive in [".text", ".data", ".bss"]:  # Sections
             self.current_section = directive
         elif directive == ".org":
+            print (f"ORG directive: {int(line[1].value, 0):04X}")
             value = int(line[1].value, 0)
             if value < 0 or value >= len(self.memory):
                 Zx16Errors.add_error(
@@ -320,10 +325,14 @@ class ZX16SecondPassEncoder:
                 return
             if value < DEFAULT_SYMBOLS["CODE_START"]:
                 self.current_section = ".inter"
+                self.section_pointers[".inter"] = value
             elif value < DEFAULT_SYMBOLS["MMIO_BASE"]:
                 self.current_section = ".text"
+                self.section_pointers[".text"] = value
             else:
                 self.current_section = "MMIO"
+                self.section_pointers["MMIO"] = value 
+            
         elif directive in [".byte", ".word", ".string", ".ascii", ".space", ".fill"]:
             if directive in [".byte"]:
                 for operand in line[1:]:
