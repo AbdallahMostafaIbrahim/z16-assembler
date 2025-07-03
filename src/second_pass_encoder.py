@@ -30,6 +30,7 @@ class ZX16SecondPassEncoder:
             ".text": data.memory_layout[".text"],
             ".data": data.memory_layout[".data"],
             ".bss": data.memory_layout[".bss"],
+            "MMIO": data.memory_layout["MMIO_BASE"],
         }
         self.memory = bytearray(65536)  # Data to be assembled (64KB)
 
@@ -322,13 +323,7 @@ class ZX16SecondPassEncoder:
             elif value < DEFAULT_SYMBOLS["MMIO_BASE"]:
                 self.current_section = ".text"
             else:
-                Zx16Errors.add_error(
-                    f"ORG value {value} cannot be in MMIO range (0x{DEFAULT_SYMBOLS['MMIO_BASE']:04x}–0xFFFF)",
-                    line[1].line,
-                    line[1].column,
-                )
-                return
-            self.section_pointers[self.current_section] = value
+                self.current_section = "MMIO"
         elif directive in [".byte", ".word", ".string", ".ascii", ".space", ".fill"]:
             if directive in [".byte"]:
                 for operand in line[1:]:
