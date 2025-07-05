@@ -70,6 +70,9 @@ class ZX16SecondPassEncoder:
                 token.type = TokenType.IMMEDIATE
                 if symbol.section == "const":
                     token.value = str(symbol.value)
+                elif symbol.section == "MMIO":
+                    token.was_label = True
+                    token.value = str(symbol.value)
                 else:
                     token.was_label = True
                     token.value = str(
@@ -124,7 +127,6 @@ class ZX16SecondPassEncoder:
 
         elif instruction == "la":
             reg = line[1].value
-
             # TODO: la should only accept labels?
             if line[3].was_label == False:
                 Zx16Errors.add_error(

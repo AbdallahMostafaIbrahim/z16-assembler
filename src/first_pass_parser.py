@@ -17,13 +17,16 @@ class ZX16FirstPassParser:
         self.current_token = (
             self.tokens[0] if tokens else Token(TokenType.EOF, "", 1, 1)
         )
-        self.current_section: Literal[".inter", ".text", ".data", ".bss"] = ".text"
+        self.current_section: Literal[".inter", ".text", ".data", ".bss", "MMIO"] = (
+            ".text"
+        )
         self.section_pointers: Dict[str, int] = {
             # Those are all relative to the start of each section
             ".inter": 0x0000,
             ".text": 0x0000,
             ".data": 0x0000,
             ".bss": 0x0000,
+            "MMIO": 0x0000,
         }
         self.memory_layout = {
             ".inter": DEFAULT_SYMBOLS["INT_VECTORS"],
@@ -170,7 +173,7 @@ class ZX16FirstPassParser:
                 self.section_pointers[".inter"] = value
             elif value < DEFAULT_SYMBOLS["MMIO_BASE"]:
                 self.current_section = ".text"
-                self.section_pointers[".text"] = value
+                self.section_pointers[".text"] = value - DEFAULT_SYMBOLS["CODE_START"]
             else:
                 self.current_section = "MMIO"
                 self.section_pointers["MMIO"] = value
