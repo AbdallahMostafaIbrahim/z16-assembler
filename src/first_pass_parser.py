@@ -170,10 +170,10 @@ class ZX16FirstPassParser:
                 self.section_pointers[".inter"] = value
             elif value < DEFAULT_SYMBOLS["MMIO_BASE"]:
                 self.current_section = ".text"
-                self.section_pointers[".text"] = value - DEFAULT_SYMBOLS["CODE_START"]
+                self.section_pointers[".text"] = value
             else:
-                pass
-
+                self.current_section = "MMIO"
+                self.section_pointers["MMIO"] = value
 
             self.advance()
         # Data Directives
@@ -330,7 +330,6 @@ class ZX16FirstPassParser:
             self.advance()
 
     def calculate_memory_layout(self):
-
 
         self.memory_layout[".data"] = (
             self.memory_layout[".text"] + self.section_pointers[".text"]
