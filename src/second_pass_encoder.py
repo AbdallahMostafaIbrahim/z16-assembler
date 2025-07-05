@@ -23,7 +23,9 @@ class ZX16SecondPassEncoder:
         self.tokens = data.tokens
         self.symbol_table = data.symbol_table
         self.lines: List[List[Token]] = []  # List of lines with tokens
-        self.current_section: Literal[".inter", ".text", ".data", ".bss","MMIO"] = ".text"
+        self.current_section: Literal[".inter", ".text", ".data", ".bss", "MMIO"] = (
+            ".text"
+        )
         self.section_pointers: Dict[str, int] = {
             # Those are all relative to the start of each section
             ".inter": data.memory_layout[".inter"],
@@ -51,8 +53,6 @@ class ZX16SecondPassEncoder:
         # Print token values for debugging
         if self.verbose:
             print("Resolving symbols in tokens:")
-            for token in self.tokens:
-                print(f"Token: {token.value} (Type: {token.type})")
 
         for token in self.tokens:
             if token.type != TokenType.IDENTIFIER:
@@ -290,8 +290,6 @@ class ZX16SecondPassEncoder:
         """Write a value to the memory at the specified address."""
         address = self.section_pointers[self.current_section]
 
-
-
         # Little endian encoding
         if 0 <= address < len(self.memory):
             if size == 1:
@@ -328,8 +326,8 @@ class ZX16SecondPassEncoder:
                 self.section_pointers[".text"] = value
             else:
                 self.current_section = "MMIO"
-                self.section_pointers["MMIO"] = value 
-            
+                self.section_pointers["MMIO"] = value
+
         elif directive in [".byte", ".word", ".string", ".ascii", ".space", ".fill"]:
             if directive in [".byte"]:
                 for operand in line[1:]:
@@ -525,8 +523,8 @@ class ZX16SecondPassEncoder:
         # TODO : Resolve symbols in the lines
 
         for idx, line in enumerate(self.lines):
-            if self.verbose:
-                print(f"Processing line: {[token.value for token in line]}")
+            # if self.verbose:
+            #     print(f"Processing line: {[token.value for token in line]}")
             # Look at the first token to determine the type of line
             if line[0].type == TokenType.EOF:  # End of file
                 break
