@@ -53,20 +53,36 @@ class Zx16Errors(object):
         Zx16Errors.warnings.clear()
 
     @staticmethod
+    @staticmethod
     def print_errors() -> None:
-        """Print all errors and warnings."""
+        # ANSI color codes
+        RED = "\033[31m"
+        YELLOW = "\033[33m"
+        GREEN = "\033[32m"
+        RESET = "\033[0m"
+
         for error in Zx16Errors.errors:
-            print(f"Error at line {error.line}: {error.message}", file=sys.stderr)
+            print(
+                f"{RED}Error at line {error.line}:{RESET} {error.message}",
+                file=sys.stderr,
+            )
 
         for warning in Zx16Errors.warnings:
-            print(f"Warning at line {warning.line}: {warning.message}", file=sys.stderr)
+            print(
+                f"{YELLOW}Warning at line {warning.line}:{RESET} {warning.message}",
+                file=sys.stderr,
+            )
 
         if Zx16Errors.errors:
             print(
-                f"\nAssembly failed with {len(Zx16Errors.errors)} errors, {len(Zx16Errors.warnings)} warnings.",
+                f"{RED}\nAssembly failed with {len(Zx16Errors.errors)} errors, "
+                f"{len(Zx16Errors.warnings)} warnings.{RESET}",
                 file=sys.stderr,
             )
         elif Zx16Errors.warnings:
-            print(f"\nAssembly completed with {len(Zx16Errors.warnings)} warnings.")
+            print(
+                f"{YELLOW}\nAssembly completed with {len(Zx16Errors.warnings)} warnings.{RESET}",
+                file=sys.stderr,
+            )
         else:
-            print("Assembly completed successfully.")
+            print(f"{GREEN}Assembly completed successfully.{RESET}", file=sys.stderr)

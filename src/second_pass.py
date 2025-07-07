@@ -1,39 +1,31 @@
 from typing import List
 from tokenizer import TokenType, Token
-from typing import Dict, List, Literal
+from typing import Dict, List
 from error_handler import Zx16Errors
 from constants import (
     DEFAULT_SYMBOLS,
-    PSEUDO_INSTRUCTIONS,
     INSTRUCTION_FORMAT,
+    PSEUDO_INSTRUCTIONS,
     ConstantField,
-    ImmediateField,
+    NumericField,
     PunctuationField,
+    RegisterField,
 )
-from dataclasses import dataclass
-from first_pass_parser import FirstPassResult
-from utils import binary_to_decimal, decimal_to_binary
+from utils import sign_extend
+from definitions import SectionType
 
 
-class ZX16SecondPassEncoder:
-    """Second Pass Encoder for ZX16 assembly language."""
-
-    def __init__(self, data: FirstPassResult, verbose: bool = False):
+class SecondPass:
+    def __init__(
+        self, tokens: Token, memory_layout: Dict["str", int], verbose: bool = False
+    ):
         self.verbose = verbose
-        self.tokens = data.tokens
-        self.symbol_table = data.symbol_table
+
+        self.current_section: SectionType = ".text"
+        self.section_pointers = memory_layout
+
+        self.tokens = tokens
         self.lines: List[List[Token]] = []  # List of lines with tokens
-        self.current_section: Literal[".inter", ".text", ".data", ".bss", "MMIO"] = (
-            ".text"
-        )
-        self.section_pointers: Dict[str, int] = {
-            # Those are all relative to the start of each section
-            ".inter": data.memory_layout[".inter"],
-            ".text": data.memory_layout[".text"],
-            ".data": data.memory_layout[".data"],
-            ".bss": data.memory_layout[".bss"],
-            "MMIO": DEFAULT_SYMBOLS["MMIO_BASE"],
-        }
         self.memory = bytearray(65536)  # Data to be assembled (64KB)
 
     def lionize(self) -> None:
@@ -49,43 +41,6 @@ class ZX16SecondPassEncoder:
         if current_line:
             self.lines.append(current_line)
 
-    def resolve_symbols(self):
-        # Print token values for debugging
-        if self.verbose:
-            print("Resolving symbols in tokens:")
-
-        for token in self.tokens:
-            if token.type != TokenType.IDENTIFIER:
-                continue
-
-            # Skip any instructions
-            if (
-                token.value.lower() in INSTRUCTION_FORMAT
-                or token.value.lower() in PSEUDO_INSTRUCTIONS
-            ):
-                continue
-            # Resolve symbols in the symbol table
-            if token.type == TokenType.IDENTIFIER and token.value in self.symbol_table:
-                symbol = self.symbol_table[token.value]
-                token.type = TokenType.IMMEDIATE
-                if symbol.section == "const":
-                    token.value = str(symbol.value)
-                elif symbol.section == "MMIO":
-                    token.was_label = True
-                    token.value = str(symbol.value)
-                else:
-                    token.was_label = True
-                    token.value = str(
-                        symbol.value + self.section_pointers[symbol.section]
-                    )
-            else:
-                # If the symbol is not found, report an error
-                Zx16Errors.add_error(
-                    f"Undefined symbol: {token.value}", token.line, token.column
-                )
-                token.type = TokenType.IMMEDIATE
-                token.value = "0"
-
     def resolve_pseudo_instructions(self, line: List[Token], idx: int) -> List[Token]:
         """Expand psuedo instruction like
         i16, la, push, pop, call, ret, inc, dec, neg, not, clr, nop
@@ -98,20 +53,18 @@ class ZX16SecondPassEncoder:
         if instruction == "li16":
             reg = line[1].value
             value = int(line[3].value)
-            auipc_imm = value >> 7
+            lui_imm = value >> 7
             addi_imm = value & 0x7F
+
             # Check if the addi_imm is signed
             if addi_imm & 0x40:
-                auipc_imm += 1
+                lui_imm += 1
             line = [
                 Token(TokenType.IDENTIFIER, "lui", line[0].line, line[0].column),
                 Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
                 Token(TokenType.COMMA, ",", line[0].line, line[0].column),
                 Token(
-                    TokenType.IMMEDIATE,
-                    str(auipc_imm),
-                    line[0].line,
-                    line[0].column,
+                    TokenType.IMMEDIATE, str(lui_imm), line[0].line, line[0].column, 9
                 ),
             ]
             # build the ADDI instruction tokens (low 7 bits & 0x7F)
@@ -119,7 +72,9 @@ class ZX16SecondPassEncoder:
                 Token(TokenType.IDENTIFIER, "addi", line[0].line, line[0].column),
                 Token(TokenType.REGISTER, reg, line[1].line, line[1].column),
                 Token(TokenType.COMMA, ",", line[2].line, line[2].column),
-                Token(TokenType.IMMEDIATE, str(addi_imm), line[3].line, line[3].column),
+                Token(
+                    TokenType.IMMEDIATE, str(addi_imm), line[3].line, line[3].column, 7
+                ),
             ]
             self.lines[idx] = line  # replace the original instruction
             # insert the ADDI right after, shifting the rest down
@@ -127,8 +82,7 @@ class ZX16SecondPassEncoder:
 
         elif instruction == "la":
             reg = line[1].value
-            # TODO: la should only accept labels?
-            if line[3].was_label == False:
+            if line[3].type != TokenType.LABEL_USE:
                 Zx16Errors.add_error(
                     f"LA instruction expects a label, got {line[3].value}",
                     line[3].line,
@@ -136,21 +90,17 @@ class ZX16SecondPassEncoder:
                 )
                 return line
             label = int(line[3].value) - self.section_pointers[self.current_section]
-
-            auipc_imm = label >> 7
+            lui_imm = label >> 7
             addi_imm = label & 0x7F
             # Check if the addi_imm is signed
             if addi_imm & 0x40:
-                auipc_imm += 1
+                lui_imm += 1
             line = [
                 Token(TokenType.IDENTIFIER, "auipc", line[0].line, line[0].column),
                 Token(TokenType.REGISTER, reg, line[0].line, line[0].column),
                 Token(TokenType.COMMA, ",", line[0].line, line[0].column),
                 Token(
-                    TokenType.IMMEDIATE,
-                    str(auipc_imm),
-                    line[0].line,
-                    line[0].column,
+                    TokenType.IMMEDIATE, str(lui_imm), line[0].line, line[0].column, 9
                 ),
             ]
             second_line = [
@@ -158,10 +108,7 @@ class ZX16SecondPassEncoder:
                 Token(TokenType.REGISTER, reg, line[1].line, line[1].column),
                 Token(TokenType.COMMA, ",", line[2].line, line[2].column),
                 Token(
-                    TokenType.IMMEDIATE,
-                    str(addi_imm),
-                    line[3].line,
-                    line[3].column,
+                    TokenType.IMMEDIATE, str(addi_imm), line[3].line, line[3].column, 7
                 ),
             ]
             self.lines[idx] = line  # replace the original instruction
@@ -211,11 +158,10 @@ class ZX16SecondPassEncoder:
                 Token(TokenType.REGISTER, "x1", line[0].line, line[0].column),
                 Token(TokenType.COMMA, ",", line[0].line, line[0].column),
                 Token(
-                    TokenType.IMMEDIATE,
+                    TokenType.LABEL_USE,
                     offset,
                     line[0].line,
                     line[0].column,
-                    was_label=True,
                 ),  # Placeholder
             ]
             self.lines[idx] = line
@@ -306,20 +252,11 @@ class ZX16SecondPassEncoder:
 
     def encode_directive(self, line: List[Token]) -> None:
         """Encode a directive line."""
-        # TODO: ADD .inter instead of org only access in pass 1 and pass 2
-        # TODO: check org value is in the right range
         directive = line[0].value.lower()
-        if directive in [".text", ".data", ".bss"]:  # Sections
+        if directive in [".inter", ".text", ".data", ".bss", ".mmio"]:  # Sections
             self.current_section = directive
         elif directive == ".org":
             value = int(line[1].value, 0)
-            if value < 0 or value >= len(self.memory):
-                Zx16Errors.add_error(
-                    f"ORG value {value} out of bounds (0-65535)",
-                    line[1].line,
-                    line[1].column,
-                )
-                return
             if value < DEFAULT_SYMBOLS["CODE_START"]:
                 self.current_section = ".inter"
                 self.section_pointers[".inter"] = value
@@ -331,13 +268,13 @@ class ZX16SecondPassEncoder:
                 self.section_pointers["MMIO"] = value
 
         elif directive in [".byte", ".word", ".string", ".ascii", ".space", ".fill"]:
-            if directive in [".byte"]:
+            if directive == ".byte":
                 for operand in line[1:]:
                     if operand.type == TokenType.COMMA or operand.type == TokenType.EOF:
                         continue
                     value = int(operand.value, 0)
                     self.write_memory(value, 1)
-            elif directive in [".word"]:
+            elif directive == ".word":
                 for operand in line[1:]:
                     if operand.type == TokenType.COMMA or operand.type == TokenType.EOF:
                         continue
@@ -348,17 +285,16 @@ class ZX16SecondPassEncoder:
                 for char in value:
                     self.write_memory(ord(char), 1)
                 if directive == ".string":
-                    self.write_memory(0, 1)
+                    self.write_memory(0, 1)  # Null terminator for strings
             elif directive == ".space":
                 for i in range(int(line[1].value)):
-                    self.write_memory(0, 1)
+                    self.write_memory(0, 1)  # Fill with zeros
             elif directive == ".fill":
-                fill_items = int(line[1].value, 0)
-                fill_size = int(line[3].value, 0)
-                fill_value = int(line[5].value, 0)
-                for i in range(fill_items):
-                    for _ in range(fill_size):
-                        self.write_memory(fill_value, fill_size)
+                fill_items = int(line[1].value, 0)  # Number of items to fill
+                fill_size = int(line[3].value, 0)  # Size of each item in bytes
+                fill_value = int(line[5].value, 0)  # Value to fill with
+                for _ in range(fill_items):  # For each item
+                    self.write_memory(fill_value, fill_size)
 
     def encode_instruction(self, line: List[Token]) -> None:
         """Encode an instruction line, reporting errors via Zx16Errors."""
@@ -368,32 +304,34 @@ class ZX16SecondPassEncoder:
                 f"Unknown instruction '{mnemonic}'", line[0].line, line[0].column
             )
             return
-        specs = INSTRUCTION_FORMAT[mnemonic]
-        word = 0
+        fields = INSTRUCTION_FORMAT[mnemonic]
+        word = 0  # Initialize the instruction word
 
-        # 1) Lay down all constants
-        for field in specs:
+        # Lay down all constants
+        for field in fields:
             if isinstance(field, ConstantField):
                 word |= int(field.const_value, 2) << field.beginning
 
-        # 2) Consume tokens for punctuation, registers, immediates
+        # Consume tokens for punctuation, registers, immediates
         token_idx = 1
-        for field in specs:
-            if isinstance(field, ConstantField):
-                continue  # already handled
+        for field in fields:
+            if isinstance(field, ConstantField):  # Skip constants, they are already set
+                continue
 
             if token_idx >= len(line):
                 Zx16Errors.add_error(
-                    f"Missing token for field {field}", line[-1].line, line[-1].column
+                    f"Missing token(s) for field {field}",
+                    line[-1].line,
+                    line[-1].column,
                 )
                 return
             token = line[token_idx]
 
-            # --- punctuation ---
+            # Punctuation
             if isinstance(field, PunctuationField):
                 if token.type is not field.expected_token:
                     Zx16Errors.add_error(
-                        f"Expected punctuation {field.expected_token}, got {token.type}",
+                        f"Expected token {field.expected_token}, got {token.type}",
                         token.line,
                         token.column,
                     )
@@ -401,110 +339,67 @@ class ZX16SecondPassEncoder:
                 token_idx += 1
                 continue
 
-            # --- register operand ---
-            if field.expected_token == TokenType.REGISTER:
+            # Register operand
+            if isinstance(field, RegisterField):
                 if token.type is not TokenType.REGISTER:
                     Zx16Errors.add_error(
-                        f"Expected REGISTER, got {token.type} for '{mnemonic}'",
+                        f"Expected token REGISTER, got {token.type} for '{mnemonic}'",
                         token.line,
                         token.column,
                     )
                     return
-                try:
-                    reg_index = int(token.value[1])
-                except (IndexError, ValueError):
-                    Zx16Errors.add_error(
-                        f"Invalid register syntax '{token.value}'",
-                        token.line,
-                        token.column,
-                    )
-                    return
-                if not (0 <= reg_index <= 7):
-                    Zx16Errors.add_error(
-                        f"Register index {reg_index} out of range (0–7)",
-                        token.line,
-                        token.column,
-                    )
-                    return
+                reg_index = int(token.value[1])
                 word |= reg_index << field.beginning
                 token_idx += 1
                 continue
 
-            # --- immediate operand ---
-            # ImmediateField inherits from OperandField and carries min_value/max_value
-            if isinstance(field, ImmediateField):
-                if token.type is not TokenType.IMMEDIATE:
+            # Immediate
+            if isinstance(field, NumericField):
+                if field.label ^ (token.type is TokenType.LABEL_USE):
+                    if token.type is not field.expected_token:
+                        Zx16Errors.add_error(
+                            f"Expected token {field.expected_token}, got {token.type} for '{mnemonic}'",
+                            token.line,
+                            token.column,
+                        )
+                        return
+                if (not field.label) ^ (token.type is TokenType.IMMEDIATE):
                     Zx16Errors.add_error(
-                        f"Expected IMMEDIATE, got {token.type} for '{mnemonic}'",
+                        f"Expected token IMMEDIATE, got {token.type} for '{mnemonic}'",
                         token.line,
                         token.column,
                     )
                     return
 
                 imm = int(token.value, 0)
-                # label resolution
-                if token.was_label:
+                if field.label:
                     imm -= self.section_pointers[self.current_section]
-                if token.was_label and mnemonic in [
-                    "jal",
-                    "j",
-                    "jr",
-                    "jalr",
-                    "beq",
-                    "bne",
-                    "bz",
-                    "bnz",
-                    "blt",
-                    "bge",
-                    "bltu",
-                    "bgeu",
-                ]:
-                    imm = int(imm / 2)  # integer division by 2 for branch offsets
-
-                # parse
-                try:
-                    # TODO: look at li 128 for, which the immediate is 128, but the field width is 7 bits, but somehow it works
-                    imm = binary_to_decimal(
-                        decimal_to_binary(imm, field.width),
-                        signed=field.signed,
-                    )
-                except ValueError:
+                    imm = int(imm / 2)
+                checker = sign_extend(imm, token.width, field.signed)
+                if not (field.min_value <= checker <= field.max_value):
                     Zx16Errors.add_error(
-                        f"Invalid immediate '{token.value}'", token.line, token.column
+                        f"Immediate value {imm} out of range [{field.min_value}, {field.max_value}] for '{mnemonic}'",
+                        token.line,
+                        token.column,
                     )
                     return
-                # range check against the field’s own bounds
-                if not (field.min_value <= imm <= field.max_value):
-                    if token.was_label:
-                        Zx16Errors.add_error(
-                            f"Label out of range [{field.min_value}..{field.max_value}]",
-                            token.line,
-                            token.column,
-                        )
-                    else:
-                        Zx16Errors.add_error(
-                            f"Immediate {imm} out of range [{field.min_value}..{field.max_value}]",
-                            token.line,
-                            token.column,
-                        )
-                    return
-
                 # encode: split or contiguous
                 if field.allocations:
+                    prev_width = 0
                     for alloc in field.allocations:
-                        width = alloc.i_end - alloc.i_beginning + 1
-                        mask = ((1 << width) - 1) << alloc.i_beginning
-                        piece = (imm & mask) >> alloc.i_beginning
-                        word |= piece << alloc.m_beginning
-                else:
-                    word |= (
-                        imm & ((1 << (field.end - field.beginning + 1)) - 1)
-                    ) << field.beginning
+                        width = alloc.end - alloc.beginning + 1
+                        mask = ((1 << width) - 1) << prev_width
+                        word |= (imm & mask) << (alloc.beginning - prev_width)
+                        prev_width += width
 
+                else:
+                    width = field.end - field.beginning + 1
+                    mask = (1 << width) - 1
+                    word |= (imm & mask) << field.beginning
                 token_idx += 1
                 continue
 
-            # If we get here, it’s an unexpected field type
+            # If we get here, it’s an unexpected field type, this should not happen
             Zx16Errors.add_error(
                 f"Unhandled field type {type(field).__name__} in '{mnemonic}'",
                 token.line,
@@ -514,19 +409,16 @@ class ZX16SecondPassEncoder:
 
         # 3) Write out the two-byte instruction
         self.write_memory(word, 2)
-        if self.verbose:
-            print(
-                f"Encoded {mnemonic}: 0x{word:04X} 0b{word:016b} @ {self.current_section}:{self.section_pointers[self.current_section]} or address {self.section_pointers[self.current_section]:04X}"
-            )
+        # DEBUG MODE
+        # if self.verbose:
+        #     print(
+        #         f"Encoded {mnemonic}: 0x{word:04X} 0b{word:016b} @ {self.current_section}:{self.section_pointers[self.current_section]} or address {self.section_pointers[self.current_section]:04X}"
+        #     )
 
     def execute(self) -> bytearray:
-        self.resolve_symbols()
         self.lionize()
-        # TODO : Resolve symbols in the lines
 
         for idx, line in enumerate(self.lines):
-            # if self.verbose:
-            #     print(f"Processing line: {[token.value for token in line]}")
             # Look at the first token to determine the type of line
             if line[0].type == TokenType.EOF:  # End of file
                 break

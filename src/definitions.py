@@ -6,8 +6,9 @@ from typing import List, Dict, Optional
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import List, Optional
+from utils import sign_extend
 
-SectionType = Literal[".text", ".data", ".bss", "const"]
+SectionType = Literal[".inter", ".text", ".data", ".bss", ".mmio"]
 
 
 class TokenType(Enum):
@@ -16,39 +17,17 @@ class TokenType(Enum):
     IDENTIFIER = auto()
     REGISTER = auto()
     IMMEDIATE = auto()
-    LABEL = auto()
+    LABEL_DEF = auto()
+    LABEL_USE = auto()
     DIRECTIVE = auto()
     STRING = auto()
-    CHARACTER = auto()
     NEWLINE = auto()
     COMMA = auto()
     LPAREN = auto()
     RPAREN = auto()
     OPERATOR = auto()
+    # TODO: Expression Support
     EOF = auto()
-
-
-class Opcode(Enum):
-    """ZX16 opcode."""
-
-    R_TYPE = 0b000
-    I_TYPE = 0b001
-    B_TYPE = 0b010
-    S_TYPE = 0b011
-    L_TYPE = 0b100
-    J_TYPE = 0b101
-    U_TYPE = 0b110
-    SYS_TYPE = 0b111
-
-
-@dataclass
-class MemoryAllocation:
-    # Memory allocation
-    m_beginning: int = None
-    m_end: int = None
-    # Immediate Allocation
-    i_beginning: int = None
-    i_end: int = None
 
 
 @dataclass
@@ -63,15 +42,15 @@ class ConstantField(BitFieldSpec):
 
 
 @dataclass
-class OperandField(BitFieldSpec):
+class RegisterField(BitFieldSpec):
     expected_token: TokenType
 
 
 @dataclass
-class ImmediateField(OperandField):
+class NumericField(BitFieldSpec):
     min_value: int
     max_value: int
-    allocations: List[MemoryAllocation]
+    allocations: List[BitFieldSpec]
 
     def __init__(
         self,
@@ -79,9 +58,10 @@ class ImmediateField(OperandField):
         beginning: Optional[int] = None,
         end: Optional[int] = None,
         # ...or a split field
-        allocations: Optional[List[MemoryAllocation]] = None,
+        allocations: Optional[List[BitFieldSpec]] = None,
         # signed by default
-        signed: bool = True,
+        signed: Optional[bool] = True,
+        label: Optional[bool] = False,
         # override bounds
         min_value: Optional[int] = None,
         max_value: Optional[int] = None,
@@ -96,15 +76,15 @@ class ImmediateField(OperandField):
         super().__init__(
             beginning=beginning or 0,
             end=end or 0,
-            expected_token=TokenType.IMMEDIATE,
         )
 
+        self.label = label
         self.allocations = allocations or []
         self.signed = signed
 
         # Compute width
         if allocations:
-            width = sum(a.i_end - a.i_beginning + 1 for a in allocations)
+            width = sum(a.end - a.beginning + 1 for a in allocations)
         else:
             width = end - beginning + 1
         self.width = width
@@ -144,16 +124,15 @@ class Token:
     value: str
     line: int
     column: int
-    was_label: bool = False
+    width: int = 0
 
 
 @dataclass
 class Symbol:
     """Represents a symbol in the symbol table."""
 
-    name: str
     value: int
-    section: SectionType
+    section: SectionType | None = None
     defined: bool = False
     global_symbol: bool = False
     line: int = 0
