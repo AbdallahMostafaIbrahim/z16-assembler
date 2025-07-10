@@ -10,6 +10,7 @@ from constants import (
     NumericField,
     PunctuationField,
     RegisterField,
+    TOKEN_TYPE_NAMES,
 )
 from utils import sign_extend
 from definitions import SectionType
@@ -320,7 +321,7 @@ class SecondPass:
 
             if token_idx >= len(line):
                 Zx16Errors.add_error(
-                    f"Missing token(s) for field {field}",
+                    f"Missing token(s) for field {TOKEN_TYPE_NAMES[field.expected_token]}",
                     line[-1].line,
                     line[-1].column,
                 )
@@ -331,7 +332,7 @@ class SecondPass:
             if isinstance(field, PunctuationField):
                 if token.type is not field.expected_token:
                     Zx16Errors.add_error(
-                        f"Expected token {field.expected_token}, got {token.type}",
+                        f"Expected token {TOKEN_TYPE_NAMES[field.expected_token]}, got {TOKEN_TYPE_NAMES[field.expected_token]}",
                         token.line,
                         token.column,
                     )
@@ -343,7 +344,7 @@ class SecondPass:
             if isinstance(field, RegisterField):
                 if token.type is not TokenType.REGISTER:
                     Zx16Errors.add_error(
-                        f"Expected token REGISTER, got {token.type} for '{mnemonic}'",
+                        f"Expected token REGISTER, got {TOKEN_TYPE_NAMES[field.expected_token]} for '{mnemonic}'",
                         token.line,
                         token.column,
                     )
@@ -358,14 +359,14 @@ class SecondPass:
                 if field.label ^ (token.type is TokenType.LABEL_USE):
                     if token.type is not field.expected_token:
                         Zx16Errors.add_error(
-                            f"Expected token {field.expected_token}, got {token.type} for '{mnemonic}'",
+                            f"Expected token {TOKEN_TYPE_NAMES[field.expected_token]}, got {TOKEN_TYPE_NAMES[field.expected_token]} for '{mnemonic}'",
                             token.line,
                             token.column,
                         )
                         return
                 if (not field.label) ^ (token.type is TokenType.IMMEDIATE):
                     Zx16Errors.add_error(
-                        f"Expected token IMMEDIATE, got {token.type} for '{mnemonic}'",
+                        f"Expected token IMMEDIATE, got {TOKEN_TYPE_NAMES[field.expected_token]} for '{mnemonic}'",
                         token.line,
                         token.column,
                     )

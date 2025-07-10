@@ -426,3 +426,19 @@ char_tokens = {
 RESERVED_KEYWORDS = (
     INSTRUCTION_FORMAT.keys() | PSEUDO_INSTRUCTIONS.keys() | DEFAULT_SYMBOLS.keys()
 )
+
+TOKEN_TYPE_NAMES = {
+    TokenType.IDENTIFIER: "identifier",
+    TokenType.REGISTER: "register",
+    TokenType.IMMEDIATE: "immediate",
+    TokenType.LABEL_DEF: "label definition",
+    TokenType.LABEL_USE: "label use",
+    TokenType.DIRECTIVE: "directive",
+    TokenType.STRING: "string",
+    TokenType.NEWLINE: "newline",
+    TokenType.COMMA: "comma",
+    TokenType.LPAREN: "left parenthesis",
+    TokenType.RPAREN: "right parenthesis",
+    TokenType.OPERATOR: "operator",
+    TokenType.EOF: "end of file",
+}
