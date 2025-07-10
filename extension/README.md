@@ -4,6 +4,8 @@
 
 A meh Visual Studio Code extension providing full language support for Z16 Assembly programming, including syntax highlighting, intelligent code completion, error detection, and advanced navigation features.
 
+📖 **[Z16 Reference](https://github.com/shalan/z16)** - Complete Z16 architecture documentation
+
 ---
 
 ## 🚀 Features
