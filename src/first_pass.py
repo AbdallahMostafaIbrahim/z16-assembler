@@ -7,6 +7,7 @@ from constants import (
     PSEUDO_INSTRUCTIONS,
     INSTRUCTION_FORMAT,
     RESERVED_KEYWORDS,
+    TOKEN_TYPE_NAMES,
 )
 
 
@@ -93,9 +94,10 @@ class FirstPass:
             return True
 
         # Build a nice error message listing all expected types
-        names = ", ".join(t.name for t in expected_types)
+        names = ", ".join(TOKEN_TYPE_NAMES[t] for t in expected_types)
+        escaped_value = tok.value.replace(chr(10), "\\n")
         Zx16Errors.add_error(
-            f"Expected token type(s) {names}, got {tok.value} ({tok.type.name})",
+            f"Expected token type(s) {names}, got {escaped_value} ({tok.type.name})",
             tok.line,
             tok.column,
         )
