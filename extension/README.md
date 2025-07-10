@@ -2,8 +2,6 @@
 
 > **NOTE:** This extension is completely vibe coded with claude
 
-![Z16 Assembly Extension](/extension/images/icon.png)
-
 A meh Visual Studio Code extension providing full language support for Z16 Assembly programming, including syntax highlighting, intelligent code completion, error detection, and advanced navigation features.
 
 ---
@@ -315,8 +313,8 @@ MIT License - see LICENSE file for details.
 
 ## 🔗 Links
 
-- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Abdallah.z16-assembly)
-- [Repo](https://github.com/AbdallahMostafaIbrahim/z16-assembler/extension)
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=abdallahmostafa.z16-assembly)
+- [Repo](https://github.com/AbdallahMostafaIbrahim/z16-assembler/tree/main/extension)
 - [Z16 Architecture Documentation](https://github.com/shalan/z16)
 
 ## 🙏 Acknowledgments
