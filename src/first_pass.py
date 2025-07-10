@@ -21,8 +21,7 @@ class FirstPass:
         for name, value in DEFAULT_SYMBOLS.items():
             self.define_symbol(name, value)
         self.pos = 0
-        self.current_token = self.tokens[0
-        ]
+        self.current_token = self.tokens[0]
         self.current_section: SectionType = (
             ".text"  # Start in the text section by default
         )
@@ -365,6 +364,8 @@ class FirstPass:
         # Adjust symbol values based on section pointers
         memory_layout = self.calculate_memory_layout()
         for _, symbol in self.symbol_table.items():
+            if isinstance(symbol.value, str):
+                continue
             symbol.value += memory_layout.get(symbol.section, 0)
 
         for token in self.tokens:

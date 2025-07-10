@@ -2,7 +2,7 @@
   "name": "z16-assembly",
   "displayName": "Zx16 ISA Language Support",
   "description": "Syntax highlighting and language support for Z16 Assembly",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "abdallahmostafa",
   "icon": "images/icon.png",
   "repository": {
