@@ -1,0 +1,140 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Z16 Assembly",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#labels"
+    },
+    {
+      "include": "#directives"
+    },
+    {
+      "include": "#instructions"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#registers"
+    },
+    {
+      "include": "#constants"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.z16",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "labels": {
+      "patterns": [
+        {
+          "name": "entity.name.function.z16",
+          "match": "^\\s*([a-zA-Z_][a-zA-Z0-9_]*):"
+        }
+      ]
+    },
+    "directives": {
+      "patterns": [
+        {
+          "name": "keyword.control.directive.z16",
+          "match": "\\.(equ|text|data|inter|bss|mmio|org|byte|word|string|ascii|space|fill)\\b"
+        }
+      ]
+    },
+    "instructions": {
+      "patterns": [
+        {
+          "name": "keyword.control.rtype.z16",
+          "match": "\\b(add|sub|slt|sltu|sll|srl|sra|or|and|xor|mv|jr|jalr)\\b"
+        },
+        {
+          "name": "keyword.control.itype.z16",
+          "match": "\\b(addi|slti|sltui|slli|srli|srai|ori|andi|xori|li)\\b"
+        },
+        {
+          "name": "keyword.control.branch.z16",
+          "match": "\\b(beq|bne|bz|bnz|blt|bge|bltu|bgeu)\\b"
+        },
+        {
+          "name": "keyword.control.memory.z16",
+          "match": "\\b(sb|sw|lb|lw|lbu)\\b"
+        },
+        {
+          "name": "keyword.control.jump.z16",
+          "match": "\\b(j|jal)\\b"
+        },
+        {
+          "name": "keyword.control.upper.z16",
+          "match": "\\b(lui|auipc)\\b"
+        },
+        {
+          "name": "keyword.control.system.z16",
+          "match": "\\b(ecall)\\b"
+        },
+        {
+          "name": "keyword.control.pseudo.z16",
+          "match": "\\b(li16|la|push|pop|call|ret|inc|dec|neg|not|clr|nop)\\b"
+        }
+      ]
+    },
+    "registers": {
+      "patterns": [
+        {
+          "name": "variable.language.register.z16",
+          "match": "\\b(t0|t1|ra|sp|s0|s1|a0|a1|x[0-7])\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.z16",
+          "match": "\\b0x[0-9a-fA-F]+\\b"
+        },
+        {
+          "name": "constant.numeric.decimal.z16",
+          "match": "\\b-?\\d+\\b"
+        },
+        {
+          "name": "constant.character.z16",
+          "match": "'[^']*'"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.z16",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.z16",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.other.z16",
+          "match": "\\b[A-Z_][A-Z0-9_]+\\b"
+        }
+      ]
+    }
+  },
+  "scopeName": "source.z16"
+}

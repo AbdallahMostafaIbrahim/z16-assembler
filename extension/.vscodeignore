@@ -1,0 +1,7 @@
+test.z16
+.vscode/
+*.vsix
+node_modules/
+.git/
+.gitignore
+*.log

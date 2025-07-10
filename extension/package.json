@@ -1,0 +1,47 @@
+{
+  "name": "z16-assembly",
+  "displayName": "Zx16 ISA Language Support",
+  "description": "Syntax highlighting and language support for Z16 Assembly",
+  "version": "0.1.0",
+  "publisher": "abdallahmostafa",
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AbdallahMostafaIbrahim/z16-assembler"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "z16",
+        "aliases": [
+          "Z16 Assembly",
+          "z16"
+        ],
+        "extensions": [
+          ".z16",
+          ".s",
+          ".asm"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "z16",
+        "scopeName": "source.z16",
+        "path": "./syntaxes/z16.tmLanguage.json"
+      }
+    ]
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
