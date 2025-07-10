@@ -372,7 +372,78 @@ function activate(context) {
       description: "Equate directive: .equ symbol, value",
       syntax: ".equ ${1:symbol}, ${2:value}",
     },
+    {
+      name: "set",
+      description: "Set directive: .set symbol, value",
+      syntax: ".set ${1:symbol}, ${2:value}",
+    },
   ];
+
+  // Define default constants for Z16 assembler
+  const defaultConstants = {
+    __WORD_SIZE__: {
+      value: "2",
+      description: "Word size in bytes",
+    },
+    __DATA_SIZE__: {
+      value: "16",
+      description: "Data size in bits",
+    },
+    __ADDR_SIZE__: {
+      value: "16",
+      description: "Address size in bits",
+    },
+    RESET_VECTOR: {
+      value: "0x0000",
+      description: "Reset vector address",
+    },
+    INT_VECTORS: {
+      value: "0x0000",
+      description: "Interrupt vector table start",
+    },
+    CODE_START: {
+      value: "0x0020",
+      description: "Default code start address",
+    },
+    MMIO_BASE: {
+      value: "0xF000",
+      description: "Memory-mapped I/O base address",
+    },
+    MMIO_SIZE: {
+      value: "0x1000",
+      description: "MMIO region size",
+    },
+    STACK_TOP: {
+      value: "0xEFFE",
+      description: "Default stack top address",
+    },
+    MEM_SIZE: {
+      value: "0x10000",
+      description: "Total memory size (64KB)",
+    },
+  };
+
+  // Function to extract symbols defined with .equ and .set directives
+  function extractSymbols(document) {
+    const text = document.getText();
+    const symbols = new Map();
+
+    // Match .equ and .set directives
+    const symbolMatches = text.matchAll(
+      /^\s*\.(?:equ|set)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*,\s*(.+)$/gim
+    );
+
+    for (const match of symbolMatches) {
+      const symbolName = match[1];
+      const symbolValue = match[2].trim();
+      symbols.set(symbolName, {
+        value: symbolValue,
+        type: match[0].toLowerCase().includes(".equ") ? "equ" : "set",
+      });
+    }
+
+    return symbols;
+  }
 
   // Register completion provider
   const completionProvider = vscode.languages.registerCompletionItemProvider(
@@ -457,6 +528,39 @@ function activate(context) {
           }
         }
 
+        // Add symbol completions (only if not after a dot)
+        if (!isAfterDot) {
+          const symbols = extractSymbols(document);
+          for (const [symbolName, symbolInfo] of symbols) {
+            const completion = new vscode.CompletionItem(
+              symbolName,
+              vscode.CompletionItemKind.Constant
+            );
+            completion.detail = `Symbol (${symbolInfo.type.toUpperCase()})`;
+            completion.documentation = new vscode.MarkdownString(
+              `Symbol defined with \`.${symbolInfo.type}\`\n\nValue: \`${symbolInfo.value}\``
+            );
+            completion.sortText = "4" + symbolName;
+            completions.push(completion);
+          }
+
+          // Add default constants
+          for (const [constantName, constantInfo] of Object.entries(
+            defaultConstants
+          )) {
+            const completion = new vscode.CompletionItem(
+              constantName,
+              vscode.CompletionItemKind.Constant
+            );
+            completion.detail = `Default Constant`;
+            completion.documentation = new vscode.MarkdownString(
+              `**${constantInfo.description}**\n\nValue: \`${constantInfo.value}\``
+            );
+            completion.sortText = "4" + constantName;
+            completions.push(completion);
+          }
+        }
+
         return completions;
       },
     },
@@ -502,6 +606,27 @@ function activate(context) {
         return new vscode.Hover(
           new vscode.MarkdownString(
             `**Register:** \`${word}\`\n\nAlias: ${registerAliases[word]}`
+          )
+        );
+      }
+
+      // Check if it's a symbol defined with .equ or .set
+      const symbols = extractSymbols(document);
+      if (symbols.has(word)) {
+        const symbolInfo = symbols.get(word);
+        return new vscode.Hover(
+          new vscode.MarkdownString(
+            `**Symbol:** \`${word}\`\n\nDefined with: \`.${symbolInfo.type}\`\n\nValue: \`${symbolInfo.value}\``
+          )
+        );
+      }
+
+      // Check if it's a default constant
+      if (defaultConstants[word]) {
+        const constantInfo = defaultConstants[word];
+        return new vscode.Hover(
+          new vscode.MarkdownString(
+            `**Default Constant:** \`${word}\`\n\n${constantInfo.description}\n\nValue: \`${constantInfo.value}\``
           )
         );
       }
@@ -634,6 +759,25 @@ function activate(context) {
           }
         }
 
+        // Look for symbol definition with .equ or .set
+        for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+          const line = lines[lineIndex];
+          const symbolMatch = line.match(
+            new RegExp(`^\\s*\\.(?:equ|set)\\s+(${word})\\s*,`, "i")
+          );
+
+          if (symbolMatch) {
+            const symbolStart = line.indexOf(word);
+            const symbolPosition = new vscode.Position(lineIndex, symbolStart);
+            const symbolRange = new vscode.Range(
+              symbolPosition,
+              new vscode.Position(lineIndex, symbolStart + word.length)
+            );
+
+            return new vscode.Location(document.uri, symbolRange);
+          }
+        }
+
         // If no definition found, return undefined
         return undefined;
       },
@@ -673,6 +817,21 @@ function activate(context) {
             );
             references.push(new vscode.Location(document.uri, refRange));
           }
+
+          // Check for symbol definition with .equ or .set
+          const symbolDefMatch = line.match(
+            new RegExp(`^\\s*\\.(?:equ|set)\\s+(${word})\\s*,`, "i")
+          );
+          if (symbolDefMatch) {
+            const symbolStart = line.indexOf(word);
+            const refRange = new vscode.Range(
+              lineIndex,
+              symbolStart,
+              lineIndex,
+              symbolStart + word.length
+            );
+            references.push(new vscode.Location(document.uri, refRange));
+          }
         }
 
         // Check for label references in instructions (like j, beq, call, etc.)
@@ -705,6 +864,108 @@ function activate(context) {
             refStart + word.length
           );
           references.push(new vscode.Location(document.uri, refRange));
+        }
+
+        // Check for symbol references in immediate operands (like li, addi, etc.)
+        const immediateMatch = line.match(
+          new RegExp(
+            `\\b(?:li|addi|slti|sltui|ori|andi|xori|slli|srli|srai)\\s+\\w+,\\s*(${word})\\b`
+          )
+        );
+        if (immediateMatch) {
+          const refStart = line.lastIndexOf(word);
+          const refRange = new vscode.Range(
+            lineIndex,
+            refStart,
+            lineIndex,
+            refStart + word.length
+          );
+          references.push(new vscode.Location(document.uri, refRange));
+        }
+
+        // Check for symbol references in other contexts (general symbol usage)
+        const generalMatch = line.match(new RegExp(`\\b(${word})\\b`));
+        if (
+          generalMatch &&
+          !line.match(/^\s*\.(?:equ|set)/) &&
+          !line.match(/^\s*[a-zA-Z_][a-zA-Z0-9_]*:/)
+        ) {
+          // Only add if it's not already captured by other patterns
+          const allMatches = [
+            ...line.matchAll(new RegExp(`\\b(${word})\\b`, "g")),
+          ];
+          for (const match of allMatches) {
+            const refStart = match.index;
+            const refRange = new vscode.Range(
+              lineIndex,
+              refStart,
+              lineIndex,
+              refStart + word.length
+            );
+            // Check if this reference is not already added
+            const isDuplicate = references.some(
+              (ref) =>
+                ref.range.start.line === lineIndex &&
+                ref.range.start.character === refStart
+            );
+            if (!isDuplicate) {
+              references.push(new vscode.Location(document.uri, refRange));
+            }
+          }
+        }
+      }
+
+      // For default constants, we only look for references (no definitions to include)
+      if (defaultConstants[word]) {
+        for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+          const line = lines[lineIndex];
+
+          // Check for constant references in immediate operands
+          const immediateMatch = line.match(
+            new RegExp(
+              `\\b(?:li|addi|slti|sltui|ori|andi|xori|slli|srli|srai)\\s+\\w+,\\s*(${word})\\b`
+            )
+          );
+          if (immediateMatch) {
+            const refStart = line.lastIndexOf(word);
+            const refRange = new vscode.Range(
+              lineIndex,
+              refStart,
+              lineIndex,
+              refStart + word.length
+            );
+            references.push(new vscode.Location(document.uri, refRange));
+          }
+
+          // Check for general constant usage
+          const generalMatch = line.match(new RegExp(`\\b(${word})\\b`));
+          if (
+            generalMatch &&
+            !line.match(/^\s*\.(?:equ|set)/) &&
+            !line.match(/^\s*[a-zA-Z_][a-zA-Z0-9_]*:/)
+          ) {
+            const allMatches = [
+              ...line.matchAll(new RegExp(`\\b(${word})\\b`, "g")),
+            ];
+            for (const match of allMatches) {
+              const refStart = match.index;
+              const refRange = new vscode.Range(
+                lineIndex,
+                refStart,
+                lineIndex,
+                refStart + word.length
+              );
+              // Check if this reference is not already added
+              const isDuplicate = references.some(
+                (ref) =>
+                  ref.range.start.line === lineIndex &&
+                  ref.range.start.character === refStart
+              );
+              if (!isDuplicate) {
+                references.push(new vscode.Location(document.uri, refRange));
+              }
+            }
+          }
         }
       }
 
