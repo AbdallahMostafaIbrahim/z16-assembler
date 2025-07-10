@@ -7,7 +7,7 @@ from definitions import (
     NumericField,
     PunctuationField,
 )
-
+import time
 
 INSTRUCTION_FORMAT: Dict[str, List[PunctuationField | BitFieldSpec]] = {
     "add": [
@@ -380,8 +380,26 @@ PSEUDO_INSTRUCTIONS = {
     "clr": 2,
     "nop": 2,
 }
+current_date = time.strftime("%Y-%m-%d", time.localtime())
+current_time = time.strftime("%H:%M:%S", time.localtime())
 
 DEFAULT_SYMBOLS = {
+   "__ZX16__" : 1,
+    "__ASSEMBLER__": "zx16asm",
+    "__VERSION__": "1.0.0",
+    "__DATE__": current_date,
+    "__TIME__": current_time,
+    "__WORD_SIZE__" :2,
+    "__DATA_SIZE__ ": 16,
+    "__ADDR_SIZE__ " : 16,
+    "T0": 0,
+    "RA": 1,
+    "SP": 2,
+    "S0": 3,
+    "S1": 4,
+    "T1": 5,
+    "A0": 6,
+    "A1": 7,
     "RESET_VECTOR": 0x0000,
     "INT_VECTORS": 0x0000,  # Interrupt vector table start
     "CODE_START": 0x0020,  # Default code start

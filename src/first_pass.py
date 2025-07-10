@@ -21,7 +21,8 @@ class FirstPass:
         for name, value in DEFAULT_SYMBOLS.items():
             self.define_symbol(name, value)
         self.pos = 0
-        self.current_token = self.tokens[0]
+        self.current_token = self.tokens[0
+        ]
         self.current_section: SectionType = (
             ".text"  # Start in the text section by default
         )
