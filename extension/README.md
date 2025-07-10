@@ -194,12 +194,12 @@ main:
 
 process_data:
     push x1                 # Save register
-    addi x1, x1, 10        # Add 10 to value
+    addi x1, 10             # Add 10 to x1
     pop x1                  # Restore register
     ret                     # Return
 
 end:
-    ecall 0x001            # Exit system call
+    ecall 10                # Exit program
 
 .data
 buffer: .space 64
