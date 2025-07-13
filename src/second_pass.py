@@ -357,16 +357,15 @@ class SecondPass:
             # Immediate
             if isinstance(field, NumericField):
                 if field.label ^ (token.type is TokenType.LABEL_USE):
-                    if token.type is not field.expected_token:
-                        Zx16Errors.add_error(
-                            f"Expected token {TOKEN_TYPE_NAMES[field.expected_token]}, got {TOKEN_TYPE_NAMES[field.expected_token]} for '{mnemonic}'",
-                            token.line,
-                            token.column,
-                        )
-                        return
+                    Zx16Errors.add_error(
+                        f"Expected token {TOKEN_TYPE_NAMES[TokenType.IMMEDIATE]}, got {TOKEN_TYPE_NAMES[token.type]} for '{mnemonic}'",
+                        token.line,
+                        token.column,
+                    )
+                    return
                 if (not field.label) ^ (token.type is TokenType.IMMEDIATE):
                     Zx16Errors.add_error(
-                        f"Expected token IMMEDIATE, got {TOKEN_TYPE_NAMES[field.expected_token]} for '{mnemonic}'",
+                        f"Expected token {TOKEN_TYPE_NAMES[TokenType.LABEL_USE]}, got {TOKEN_TYPE_NAMES[token.type]} for '{mnemonic}'",
                         token.line,
                         token.column,
                     )
@@ -408,6 +407,13 @@ class SecondPass:
             )
             return
 
+        if token_idx < len(line):
+            Zx16Errors.add_error(
+                f"Unexpected token(s) after instruction '{mnemonic}'",
+                line[token_idx].line,
+                line[token_idx].column,
+            )
+            return
         # 3) Write out the two-byte instruction
         self.write_memory(word, 2)
         # DEBUG MODE
