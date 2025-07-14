@@ -350,7 +350,8 @@ class FirstPass:
                 and self.current_token.value in self.symbol_table
             ):
                 value = self.symbol_table[self.current_token.value].value
-                self.current_token = Token(
+                # Oh my god aaah error
+                self.tokens[self.pos] = Token(
                     TokenType.IMMEDIATE,
                     str(value),
                     self.current_token.line,
